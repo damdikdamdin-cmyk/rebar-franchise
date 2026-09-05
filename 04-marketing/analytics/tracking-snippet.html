@@ -1,0 +1,210 @@
+<!--
+  re:bar franchise — tracking snippet v1
+  Вставить в 01-landing/index.html
+
+  ИНСТРУКЦИЯ:
+  1. Заменить YM_ID, VK_PIXEL_ID, META_PIXEL_ID на реальные
+  2. Блок <head> — счётчики
+  3. Блок перед </body> — события и UTM
+  4. Обновить обработчик leadForm (см. секцию FORM SUBMIT)
+-->
+
+<!-- ========== HEAD: счётчики ========== -->
+
+<!-- Яндекс.Метрика -->
+<script type="text/javascript">
+  (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+  m[i].l=1*new Date();
+  for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}
+  k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+  (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+  ym(YM_ID, "init", {
+    clickmap: true,
+    trackLinks: true,
+    accurateTrackBounce: true,
+    webvisor: true,
+    trackHash: true,
+    ecommerce: "dataLayer"
+  });
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/YM_ID" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+
+<!-- VK Pixel -->
+<script type="text/javascript">
+!function(){
+  var t=document.createElement("script");
+  t.type="text/javascript"; t.async=true;
+  t.src="https://vk.com/js/api/openapi.js?169";
+  t.onload=function(){ VK.Retargeting.Init("VK_PIXEL_ID"); VK.Retargeting.Hit(); };
+  document.head.appendChild(t);
+}();
+</script>
+<noscript><img src="https://vk.com/rtrg?p=VK_PIXEL_ID" style="position:fixed; left:-999px;" alt=""/></noscript>
+
+<!-- Meta Pixel -->
+<script>
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}
+(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', 'META_PIXEL_ID');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+  src="https://www.facebook.com/tr?id=META_PIXEL_ID&ev=PageView&noscript=1"/></noscript>
+
+<!-- GA4 (опционально — раскомментировать) -->
+<!--
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XXXXXXXX');
+</script>
+-->
+
+
+<!-- ========== BODY (перед </body>): UTM + события ========== -->
+<script>
+(function(){
+  'use strict';
+
+  // --- Конфиг ---
+  var YM_ID = '00000000';           // ← ЗАМЕНИТЬ
+  var VK_PIXEL_ID = 'VK_PIXEL_ID';  // ← ЗАМЕНИТЬ
+  var META_PIXEL_ID = 'META_PIXEL_ID'; // ← ЗАМЕНИТЬ
+  var UTM_KEY = 'rebar_utm';
+  var UTM_TTL_DAYS = 30;
+
+  // --- UTM: сохранение при первом визите ---
+  function parseUtm(){
+    var p = new URLSearchParams(location.search);
+    var keys = ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'];
+    var utm = {};
+    var found = false;
+    keys.forEach(function(k){
+      var v = p.get(k);
+      if(v){ utm[k] = v; found = true; }
+    });
+    if(found){
+      utm.landing_page = location.href;
+      utm.referrer = document.referrer || '';
+      utm.ts = Date.now();
+      localStorage.setItem(UTM_KEY, JSON.stringify(utm));
+    }
+    return getUtm();
+  }
+
+  function getUtm(){
+    try { return JSON.parse(localStorage.getItem(UTM_KEY)) || {}; }
+    catch(e){ return {}; }
+  }
+
+  var utm = parseUtm();
+
+  // --- Хелпер: отправка цели во все системы ---
+  function track(event, params){
+    params = params || {};
+    // Метрика
+    if(typeof ym === 'function'){
+      ym(YM_ID, 'reachGoal', event, params);
+    }
+    // VK
+    if(typeof VK !== 'undefined' && VK.Retargeting){
+      var vkMap = { lead_submit:'lead', modal_open:'view_content' };
+      if(vkMap[event]) VK.Retargeting.Event(vkMap[event]);
+    }
+    // Meta
+    if(typeof fbq === 'function'){
+      var metaMap = {
+        lead_submit: 'Lead',
+        modal_open: 'ViewContent',
+        cta_click: 'InitiateCheckout'
+      };
+      if(metaMap[event]) fbq('track', metaMap[event], params);
+    }
+    // GA4
+    if(typeof gtag === 'function'){
+      var gaMap = { lead_submit:'generate_lead', modal_open:'modal_open', calc_use:'calculator_use' };
+      if(gaMap[event]) gtag('event', gaMap[event], params);
+    }
+  }
+
+  // --- Скролл 75% ---
+  var scroll75 = false;
+  window.addEventListener('scroll', function(){
+    if(scroll75) return;
+    var pct = (window.scrollY + window.innerHeight) / document.documentElement.scrollHeight;
+    if(pct >= 0.75){ scroll75 = true; track('scroll_75'); }
+  }, {passive:true});
+
+  // --- Время 60 сек ---
+  setTimeout(function(){ track('time_60s'); }, 60000);
+
+  // --- CTA клики ---
+  document.addEventListener('click', function(e){
+    if(e.target.closest('[data-open-modal]')){
+      track('cta_click', { page_section: getSection(e.target) });
+    }
+  });
+
+  function getSection(el){
+    var sec = el.closest('section');
+    return sec ? (sec.id || 'unknown') : 'unknown';
+  }
+
+  // --- Модалка: открытие ---
+  var origOpenModal = window.openModal;
+  // Перехват через MutationObserver на modalBack
+  var modalBack = document.getElementById('modalBack');
+  if(modalBack){
+    var obs = new MutationObserver(function(muts){
+      muts.forEach(function(m){
+        if(m.attributeName === 'class' && modalBack.classList.contains('on')){
+          track('modal_open', { page_section: 'modal' });
+        }
+      });
+    });
+    obs.observe(modalBack, { attributes:true });
+  }
+
+  // --- Калькулятор ---
+  var calcTracked = false;
+  ['inv','rev','mix'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el) el.addEventListener('input', function(){
+      if(!calcTracked){ calcTracked = true; track('calc_use'); }
+    });
+  });
+  var fmt = document.getElementById('fmt');
+  if(fmt){
+    fmt.querySelectorAll('button').forEach(function(b){
+      b.addEventListener('click', function(){
+        track('calc_format', { format: b.textContent.trim() });
+      });
+    });
+  }
+
+  // --- FORM SUBMIT: заменить существующий обработчик ---
+  // Вставить ВМЕСТО текущего setTimeout в leadForm submit:
+  //
+  // track('lead_submit', {
+  //   utm_source: utm.utm_source || 'direct',
+  //   utm_medium: utm.utm_medium || 'none',
+  //   utm_campaign: utm.utm_campaign || '',
+  //   utm_content: utm.utm_content || '',
+  //   has_city: !!document.getElementById('leadCity').value,
+  //   has_note: !!document.getElementById('leadNote').value
+  // });
+  //
+  // + отправка в CRM webhook (когда будет готов)
+
+  // Экспорт для интеграции с формой
+  window.rebarTrack = track;
+  window.rebarUtm = getUtm;
+
+})();
+</script>

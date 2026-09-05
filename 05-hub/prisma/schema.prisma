@@ -1,0 +1,498 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  founder
+  uk_admin
+  uk_sales
+  uk_curator
+  partner
+  seller
+}
+
+enum StoreKind {
+  owned
+  franchise
+}
+
+enum StoreFormat {
+  flagship
+  standard
+  pickup
+}
+
+enum StoreStatus {
+  launch
+  open
+  closed
+}
+
+enum PartnerStatus {
+  onboarding
+  active
+  paused
+}
+
+enum LeadStage {
+  new
+  contacted
+  qualified
+  zoom
+  negotiation
+  contract
+  paid
+  lost
+}
+
+enum LaunchStatus {
+  active
+  opened
+  paused
+}
+
+enum TaskStatus {
+  pending
+  in_progress
+  done
+  skipped
+}
+
+enum StockDocType {
+  receipt
+  transfer
+  customer_return
+  supplier_return
+  inventory
+  writeoff
+}
+
+enum DiscountType {
+  none
+  amount
+  percent
+}
+
+enum OrderStatus {
+  draft
+  reserved
+  issued
+  cancelled
+}
+
+enum CashTxnDirection {
+  in
+  out
+}
+
+enum SerialStatus {
+  in_stock
+  reserved
+  sold
+  written_off
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role
+  partnerId    String?
+  storeId      String?
+  commissionPct Int     @default(0)
+  createdAt    DateTime @default(now())
+
+  partner Partner? @relation("PartnerUsers", fields: [partnerId], references: [id], onDelete: SetNull)
+  store   Store?   @relation("StoreStaff", fields: [storeId], references: [id], onDelete: SetNull)
+
+  curatedPartners Partner[]       @relation("PartnerCurator")
+  ownedLeads      Lead[]          @relation("LeadOwner")
+  leadActivities  LeadActivity[]
+  sales           Sale[]
+  launchProjects  LaunchProject[] @relation("LaunchCurator")
+  invitesCreated  Invite[]        @relation("InviteAuthor")
+  stockDocuments  StockDocument[]
+  cashTxns        CashTxn[]
+  orders          Order[]
+}
+
+model Invite {
+  id          String    @id @default(cuid())
+  email       String
+  role        Role
+  token       String    @unique
+  partnerId   String?
+  storeId     String?
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+  createdById String?
+
+  createdBy User?    @relation("InviteAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  partner   Partner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  store     Store?   @relation(fields: [storeId], references: [id], onDelete: SetNull)
+}
+
+model Partner {
+  id            String        @id @default(cuid())
+  name          String
+  phone         String?
+  email         String?
+  city          String
+  status        PartnerStatus @default(onboarding)
+  format        StoreFormat   @default(standard)
+  signedAt      DateTime?
+  curatorUserId String?
+  createdAt     DateTime      @default(now())
+
+  curator        User?           @relation("PartnerCurator", fields: [curatorUserId], references: [id], onDelete: SetNull)
+  users          User[]          @relation("PartnerUsers")
+  stores         Store[]
+  leads          Lead[]
+  launchProjects LaunchProject[]
+  invites        Invite[]
+}
+
+model Store {
+  id        String      @id @default(cuid())
+  name      String
+  city      String
+  kind      StoreKind
+  format    StoreFormat
+  status    StoreStatus @default(open)
+  partnerId String?
+  openedAt  DateTime?
+  address   String?
+  phone     String?
+  createdAt DateTime    @default(now())
+
+  partner        Partner?         @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  staff          User[]           @relation("StoreStaff")
+  customers      Customer[]
+  sales          Sale[]
+  launchProjects LaunchProject[]
+  invites        Invite[]
+  balances       StockBalance[]
+  serials        ProductSerial[]
+  stockDocs      StockDocument[]  @relation("DocStore")
+  stockDocsTo    StockDocument[]  @relation("DocToStore")
+  cashRegisters  CashRegister[]
+  orders         Order[]
+}
+
+model Lead {
+  id          String    @id @default(cuid())
+  name        String
+  phone       String
+  city        String?
+  note        String?
+  source      String    @default("landing")
+  stage       LeadStage @default(new)
+  ownerUserId String?
+  partnerId   String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  owner      User?          @relation("LeadOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  partner    Partner?       @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  activities LeadActivity[]
+}
+
+model LeadActivity {
+  id        String   @id @default(cuid())
+  leadId    String
+  type      String
+  body      String
+  userId    String?
+  createdAt DateTime @default(now())
+
+  lead Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  storeId   String
+  name      String
+  phone     String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  store  Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sales  Sale[]
+  orders Order[]
+
+  @@unique([storeId, phone])
+}
+
+model Sale {
+  id           String   @id @default(cuid())
+  storeId      String
+  customerId   String?
+  sellerUserId String?
+  amount       Int
+  creditAmount Int      @default(0)
+  discountTotal Int     @default(0)
+  note         String?
+  number       String?
+  soldAt       DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  store    Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  seller   User?      @relation(fields: [sellerUserId], references: [id], onDelete: SetNull)
+  lines    SaleLine[]
+  cashTxns CashTxn[]
+}
+
+model SaleLine {
+  id            String       @id @default(cuid())
+  saleId        String
+  productId     String?
+  name          String
+  qty           Int          @default(1)
+  unitPrice     Int
+  discountType  DiscountType @default(none)
+  discountValue Int          @default(0)
+  lineTotal     Int
+  serial        String?
+  note          String?
+
+  sale    Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+}
+
+model LaunchProject {
+  id            String       @id @default(cuid())
+  partnerId     String
+  storeId       String       @unique
+  curatorUserId String?
+  startedAt     DateTime     @default(now())
+  targetOpenAt  DateTime?
+  status        LaunchStatus @default(active)
+
+  partner Partner      @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  store   Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  curator User?        @relation("LaunchCurator", fields: [curatorUserId], references: [id], onDelete: SetNull)
+  tasks   LaunchTask[]
+}
+
+model LaunchTask {
+  id            String     @id @default(cuid())
+  projectId     String
+  code          String
+  title         String
+  phase         String
+  ownerRole     String
+  dueOffsetDays Int
+  sortOrder     Int
+  status        TaskStatus @default(pending)
+  completedAt   DateTime?
+  comment       String?
+
+  project LaunchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, code])
+}
+
+model ProductGroup {
+  id       String  @id @default(cuid())
+  name     String
+  parentId String?
+  sortOrder Int    @default(0)
+
+  parent   ProductGroup?  @relation("GroupTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children ProductGroup[] @relation("GroupTree")
+  products Product[]
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  note      String?
+  createdAt DateTime @default(now())
+
+  products Product[]
+  docs     StockDocument[]
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  barcode       String?
+  sku           String?
+  name          String
+  groupId       String?
+  unit          String   @default("шт")
+  warrantyDays  Int      @default(365)
+  serialTracked Boolean  @default(false)
+  purchasePrice Int      @default(0)
+  retailPrice   Int      @default(0)
+  repairPrice   Int      @default(0)
+  preorderPrice Int      @default(0)
+  minStock      Int      @default(0)
+  commissionPct Int      @default(0)
+  commissionRub Int      @default(0)
+  description   String?
+  supplierId    String?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  group    ProductGroup?   @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  supplier Supplier?       @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  balances StockBalance[]
+  serials  ProductSerial[]
+  lines    StockLine[]
+  saleLines SaleLine[]
+  orderLines OrderLine[]
+}
+
+model ProductSerial {
+  id        String       @id @default(cuid())
+  productId String
+  storeId   String
+  serial    String
+  status    SerialStatus @default(in_stock)
+  createdAt DateTime     @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, serial])
+}
+
+model StockBalance {
+  id        String @id @default(cuid())
+  storeId   String
+  productId String
+  qty       Int    @default(0)
+
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, productId])
+}
+
+model StockDocument {
+  id          String       @id @default(cuid())
+  number      String
+  type        StockDocType
+  storeId     String
+  toStoreId   String?
+  supplierId  String?
+  customerId  String?
+  userId      String?
+  comment     String?
+  totalAmount Int          @default(0)
+  paidAmount  Int          @default(0)
+  postedAt    DateTime?
+  createdAt   DateTime     @default(now())
+
+  store    Store       @relation("DocStore", fields: [storeId], references: [id], onDelete: Cascade)
+  toStore  Store?      @relation("DocToStore", fields: [toStoreId], references: [id], onDelete: SetNull)
+  supplier Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  user     User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  lines    StockLine[]
+  cashTxns CashTxn[]
+}
+
+model StockLine {
+  id            String @id @default(cuid())
+  documentId    String
+  productId     String
+  qty           Int
+  qtyAccount    Int    @default(0)
+  qtyActual     Int    @default(0)
+  price         Int    @default(0)
+  serial        String?
+  note          String?
+
+  document StockDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  product  Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+}
+
+model CashRegister {
+  id        String   @id @default(cuid())
+  storeId   String
+  name      String
+  balance   Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  store Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  txns  CashTxn[]
+}
+
+model CashCategory {
+  id        String           @id @default(cuid())
+  name      String
+  direction CashTxnDirection
+  system    Boolean          @default(false)
+
+  txns CashTxn[]
+}
+
+model CashTxn {
+  id          String           @id @default(cuid())
+  registerId  String
+  categoryId  String?
+  direction   CashTxnDirection
+  amount      Int
+  balanceAfter Int
+  saleId      String?
+  stockDocId  String?
+  userId      String?
+  recipient   String?
+  note        String?
+  occurredAt  DateTime         @default(now())
+  createdAt   DateTime         @default(now())
+
+  register CashRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
+  category CashCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  sale     Sale?         @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  stockDoc StockDocument? @relation(fields: [stockDocId], references: [id], onDelete: SetNull)
+  user     User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model Order {
+  id           String      @id @default(cuid())
+  number       String
+  storeId      String
+  customerId   String?
+  userId       String?
+  status       OrderStatus @default(draft)
+  totalAmount  Int         @default(0)
+  prepaidAmount Int        @default(0)
+  comment      String?
+  createdAt    DateTime    @default(now())
+  issuedAt     DateTime?
+
+  store    Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  user     User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  lines    OrderLine[]
+}
+
+model OrderLine {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String?
+  name      String
+  qty       Int     @default(1)
+  unitPrice Int
+  lineTotal Int
+  serial    String?
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+}

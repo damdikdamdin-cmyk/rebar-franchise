@@ -1,0 +1,31 @@
+# OS / editor
+.DS_Store
+*.local
+.tmp/
+
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+
+# node / next
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+
+# sqlite dev databases
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# CRM: скопированные оригиналы документов (пересобираются `npm run kb:import`)
+06-crm/public/kb-files/
+
+# playwright
+test-results/
+playwright-report/

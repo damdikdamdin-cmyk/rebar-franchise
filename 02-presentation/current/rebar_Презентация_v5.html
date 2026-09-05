@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>re:bar — инвестиционный меморандум v5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#cfd2d6;--paper:#f6f7f8;--paper-2:#edeef0;--ink:#0a0b0d;
+    --steel:#5b6068;--steel-lo:#8b9098;--line:rgba(10,11,13,.12);--line-2:rgba(10,11,13,.22);
+    --ok:#1f6b3a;--warn:#8a5a12;
+    --chrome:linear-gradient(90deg,#a3a7ad 0%,#f4f5f7 24%,#8b9098 50%,#eef0f2 78%,#b4b8be 100%);
+    --slide-w:1280px;--slide-h:720px;
+  }
+  html{font-size:16px;-webkit-font-smoothing:antialiased}
+  body{
+    font-family:'Manrope',sans-serif;background:#1a1c20;color:var(--ink);
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;
+    padding:1.5rem 1rem 5rem;
+  }
+  .serif{font-family:'Instrument Serif',serif;font-weight:400;letter-spacing:-.01em;line-height:1.04}
+  .mono{font-family:'JetBrains Mono',monospace;font-feature-settings:'tnum' 1}
+  .deck-nav{
+    position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);z-index:100;
+    display:flex;align-items:center;gap:.75rem;
+    background:rgba(10,11,13,.88);color:#fff;padding:.5rem 1rem;border-radius:999px;
+    backdrop-filter:blur(8px);font-size:.8125rem;
+  }
+  .deck-nav button{
+    width:2rem;height:2rem;border-radius:50%;border:1px solid rgba(255,255,255,.2);
+    background:transparent;color:#fff;cursor:pointer;font-size:1rem;
+  }
+  .deck-nav button:hover{background:rgba(255,255,255,.1)}
+  .deck-nav .count{font-variant-numeric:tabular-nums;min-width:4rem;text-align:center}
+  .deck{width:min(100%,var(--slide-w))}
+  .slide{
+    width:100%;aspect-ratio:16/9;background:var(--paper);position:relative;overflow:hidden;
+    margin-bottom:1.5rem;border-radius:.5rem;
+    box-shadow:0 24px 80px -24px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.06);
+    display:none;flex-direction:column;
+  }
+  .slide.active{display:flex}
+  .slide.dark{background:var(--ink);color:var(--paper)}
+  .slide-inner{flex:1;display:flex;flex-direction:column;padding:2.75rem 3.25rem 2.25rem}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:.4rem;
+    font-family:'JetBrains Mono',monospace;font-size:.625rem;font-weight:500;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--steel);
+  }
+  .eyebrow::before{content:'';width:.3rem;height:.3rem;border-radius:50%;background:var(--ink)}
+  .slide.dark .eyebrow{color:rgba(255,255,255,.55)}
+  .slide.dark .eyebrow::before{background:rgba(255,255,255,.5)}
+  .slide-foot{
+    margin-top:auto;padding-top:1rem;border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center;
+    font-family:'JetBrains Mono',monospace;font-size:.5625rem;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--steel-lo);
+  }
+  .slide.dark .slide-foot{border-color:rgba(255,255,255,.12);color:rgba(255,255,255,.4)}
+  h1.serif{font-size:clamp(2rem,4.2vw,3.25rem);margin-top:.75rem;max-width:18ch}
+  h2.serif{font-size:clamp(1.6rem,3.2vw,2.5rem);margin-top:.6rem;max-width:22ch}
+  .sub{font-size:.9375rem;color:var(--steel);margin-top:.75rem;max-width:42ch;line-height:1.55}
+  .slide.dark .sub{color:rgba(255,255,255,.65)}
+  .hero-accent{
+    margin-top:1.25rem;display:inline-block;
+    font-family:'JetBrains Mono',monospace;font-size:.75rem;letter-spacing:.06em;
+    padding:.5rem .875rem;background:var(--ink);color:var(--paper);border-radius:999px;
+  }
+  .slide.dark .hero-accent{background:var(--paper);color:var(--ink)}
+  .cols-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1.75rem}
+  .cols-2{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-top:1.5rem;flex:1}
+  .card{
+    border:1px solid var(--line);border-radius:.5rem;padding:1rem 1.125rem;background:#fff;
+  }
+  .slide.dark .card{background:rgba(255,255,255,.04);border-color:rgba(255,255,255,.12)}
+  .card-num{font-family:'JetBrains Mono',monospace;font-size:.625rem;color:var(--steel-lo);margin-bottom:.35rem}
+  .card h3{font-size:.875rem;font-weight:700;margin-bottom:.35rem}
+  .card p{font-size:.75rem;color:var(--steel);line-height:1.45}
+  .slide.dark .card p{color:rgba(255,255,255,.6)}
+  table{width:100%;border-collapse:collapse;margin-top:1.25rem;font-size:.75rem}
+  th,td{padding:.625rem .75rem;text-align:left;border-bottom:1px solid var(--line)}
+  th{font-family:'JetBrains Mono',monospace;font-size:.5625rem;letter-spacing:.08em;text-transform:uppercase;color:var(--steel-lo);font-weight:500}
+  td:last-child,th:last-child{text-align:right}
+  tr:last-child td{border-bottom:none}
+  .highlight{color:var(--ink);font-weight:700}
+  .slide.dark .highlight{color:#fff}
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-top:1.5rem}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:.5rem;padding:.875rem}
+  .stat .val{font-family:'Instrument Serif',serif;font-size:1.75rem}
+  .stat .lbl{font-size:.625rem;color:var(--steel-lo);text-transform:uppercase;letter-spacing:.06em;margin-top:.25rem}
+  .steps{display:grid;grid-template-columns:repeat(5,1fr);gap:.625rem;margin-top:1.25rem}
+  .step{border:1px solid var(--line);border-radius:.5rem;padding:.75rem;background:#fff}
+  .step .n{font-family:'JetBrains Mono',monospace;font-size:.5625rem;color:var(--steel-lo)}
+  .step h4{font-size:.6875rem;font-weight:700;margin:.25rem 0}
+  .step p{font-size:.625rem;color:var(--steel);line-height:1.4}
+  .step .t{font-family:'JetBrains Mono',monospace;font-size:.5625rem;color:var(--ok);margin-top:.35rem}
+  .traction{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;flex:1}
+  .store-card{background:#fff;border:1px solid var(--line);border-radius:.5rem;padding:1rem;display:flex;flex-direction:column}
+  .store-card .city{font-family:'Instrument Serif',serif;font-size:1.25rem}
+  .store-card .addr{font-size:.6875rem;color:var(--steel);margin:.25rem 0 .75rem}
+  .store-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;margin-top:auto}
+  .store-stat .v{font-weight:700;font-size:.875rem}
+  .store-stat .l{font-size:.5625rem;color:var(--steel-lo);text-transform:uppercase}
+  .promo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1.25rem}
+  .promo-card{text-align:center;padding:1.25rem 1rem;border:1px solid var(--line);border-radius:.5rem;background:#fff}
+  .promo-card .was{text-decoration:line-through;color:var(--steel-lo);font-size:.75rem}
+  .promo-card .now{font-family:'Instrument Serif',serif;font-size:2rem;margin:.25rem 0}
+  .promo-card .save{font-size:.6875rem;color:var(--ok);font-weight:600}
+  .org{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;flex:1}
+  .org-tree{display:flex;flex-direction:column;gap:.5rem}
+  .org-node{
+    border:1px solid var(--line);border-radius:.375rem;padding:.625rem .75rem;background:#fff;
+    font-size:.6875rem;
+  }
+  .org-node.ceo{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+  .org-node .role{font-weight:700}
+  .org-node .desc{color:var(--steel);font-size:.625rem;margin-top:.15rem}
+  .org-node.ceo .desc{color:rgba(255,255,255,.65)}
+  .org-branch{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
+  .gantt{margin-top:.75rem;flex:1;overflow:hidden}
+  .gantt-row{display:grid;grid-template-columns:7.5rem 1fr;gap:.5rem;align-items:center;margin-bottom:.35rem;font-size:.625rem}
+  .gantt-label{color:var(--steel);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gantt-bar-wrap{position:relative;height:1.125rem;background:var(--paper-2);border-radius:2px}
+  .gantt-bar{
+    position:absolute;top:0;height:100%;border-radius:2px;
+    background:var(--chrome);min-width:2px;
+  }
+  .gantt-bar.crit{background:var(--ink)}
+  .gantt-bar.open{background:var(--ok)}
+  .gantt-legend{display:flex;gap:1rem;margin-top:.5rem;font-size:.5625rem;color:var(--steel-lo)}
+  .gantt-legend span::before{content:'';display:inline-block;width:.625rem;height:.625rem;border-radius:1px;margin-right:.25rem;vertical-align:middle}
+  .gantt-legend .n::before{background:var(--chrome)}
+  .gantt-legend .c::before{background:var(--ink)}
+  .gantt-legend .o::before{background:var(--ok)}
+  .faq-list{margin-top:.75rem;display:grid;grid-template-columns:1fr 1fr;gap:.5rem;flex:1}
+  .faq-item{border:1px solid var(--line);border-radius:.375rem;padding:.625rem .75rem;background:#fff}
+  .faq-item h4{font-size:.6875rem;font-weight:700;margin-bottom:.2rem}
+  .faq-item p{font-size:.625rem;color:var(--steel);line-height:1.4}
+  .cta-box{
+    margin-top:1rem;display:grid;grid-template-columns:1.2fr 1fr;gap:1.25rem;flex:1;align-items:start;
+  }
+  .cta-promo{
+    background:var(--ink);color:var(--paper);border-radius:.5rem;padding:1.25rem;
+  }
+  .cta-promo .big{font-family:'Instrument Serif',serif;font-size:2.25rem}
+  .cta-promo .urgent{
+    margin-top:.75rem;font-family:'JetBrains Mono',monospace;font-size:.625rem;
+    letter-spacing:.06em;text-transform:uppercase;opacity:.7;
+  }
+  .cta-steps{display:flex;flex-direction:column;gap:.5rem}
+  .cta-step{display:flex;gap:.625rem;align-items:flex-start;font-size:.75rem}
+  .cta-step .num{
+    font-family:'JetBrains Mono',monospace;font-size:.5625rem;
+    width:1.25rem;height:1.25rem;border-radius:50%;background:var(--paper-2);
+    display:grid;place-items:center;flex-shrink:0;
+  }
+  .contacts{margin-top:.75rem;display:flex;gap:1rem;flex-wrap:wrap}
+  .contact{font-size:.75rem}
+  .contact strong{display:block;font-size:.5625rem;text-transform:uppercase;letter-spacing:.06em;color:var(--steel-lo);margin-bottom:.15rem}
+  .tag-new{
+    display:inline-block;font-family:'JetBrains Mono',monospace;font-size:.5rem;
+    letter-spacing:.08em;text-transform:uppercase;
+    background:var(--ink);color:var(--paper);padding:.15rem .4rem;border-radius:2px;margin-left:.5rem;vertical-align:middle;
+  }
+  .slide.dark .tag-new{background:var(--paper);color:var(--ink)}
+  @media print{
+    body{background:#fff;padding:0}
+    .deck-nav{display:none}
+    .slide{display:flex!important;page-break-after:always;margin:0;border-radius:0;box-shadow:none;aspect-ratio:auto;height:100vh}
+    @page{size:landscape;margin:0}
+  }
+  @media (max-width:900px){
+    .slide-inner{padding:1.5rem}
+    .cols-3,.steps,.promo-grid,.traction,.org,.faq-list,.cta-box{grid-template-columns:1fr}
+    .stat-grid{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+
+<nav class="deck-nav" aria-label="Навигация">
+  <button type="button" id="prev" aria-label="Предыдущий">←</button>
+  <span class="count mono" id="count">1 / 18</span>
+  <button type="button" id="next" aria-label="Следующий">→</button>
+</nav>
+
+<div class="deck" id="deck">
+
+<!-- 01 COVER -->
+<section class="slide dark active" data-slide="1">
+  <div class="slide-inner">
+    <span class="eyebrow">re:bar · ре-брендинг сети AppleBar · инвест-меморандум 2026</span>
+    <h1 class="serif">Магазин электроники, которого нет на рынке.</h1>
+    <p class="sub">Франшиза re:bar — 0% роялти, двойной поток дохода на кредитовании и оригинальная техника с гарантией до 2 лет.</p>
+    <span class="hero-accent">Окупаемость флагмана — от 4 месяцев</span>
+    <footer class="slide-foot">
+      <span>re:bar · Иркутск · Улан-Удэ · Россия</span>
+      <span>rebar.ru · v5</span>
+    </footer>
+  </div>
+</section>
+
+<!-- 02 WHAT -->
+<section class="slide" data-slide="2">
+  <div class="slide-inner">
+    <span class="eyebrow">01 · о проекте</span>
+    <h2 class="serif">Первая франшиза электроники с двумя потоками дохода и нулевым роялти.</h2>
+    <div class="cols-3">
+      <div class="card"><div class="card-num">01 — деньги</div><h3>0% роялти</h3><p>Через наш канал закупки — без ежемесячных отчислений с оборота.</p></div>
+      <div class="card"><div class="card-num">02 — доход</div><h3>Кредитование Lendo</h3><p>Второй поток — вознаграждение до 4% с каждой одобренной сделки.</p></div>
+      <div class="card"><div class="card-num">03 — продукт</div><h3>Оригинал + Re:Set</h3><p>Новая техника, восстановленная с гарантией и Trade-In в одном зале.</p></div>
+    </div>
+    <footer class="slide-foot"><span>re:bar</span><span>02 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 03 PAIN -->
+<section class="slide" data-slide="3">
+  <div class="slide-inner">
+    <span class="eyebrow">02 · проблема</span>
+    <h2 class="serif">Открыть магазин техники сегодня — страшно и дорого.</h2>
+    <div class="cols-3">
+      <div class="card"><div class="card-num">01</div><h3>Страх проверок</h3><p>Серые схемы и «переклейка» истории устройств. Предприниматель работает с оглядкой, а не на результат.</p></div>
+      <div class="card"><div class="card-num">02</div><h3>Роялти съедают</h3><p>Большинство франшиз берут 3–7% с оборота ежемесячно. Партнёр платит за бренд, а не зарабатывает.</p></div>
+      <div class="card"><div class="card-num">03</div><h3>Один поток</h3><p>Заработок только с наценки. Просел трафик — просела выручка. Нет второй опоры.</p></div>
+    </div>
+    <footer class="slide-foot"><span>re:bar</span><span>03 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 04 COMPARE -->
+<section class="slide" data-slide="4">
+  <div class="slide-inner">
+    <span class="eyebrow">03 · решение</span>
+    <h2 class="serif">re:bar vs типичная франшиза</h2>
+    <table>
+      <thead><tr><th>Параметр</th><th>Типичная франшиза</th><th>re:bar</th></tr></thead>
+      <tbody>
+        <tr><td>Роялти</td><td>3–7% с оборота</td><td class="highlight">0% через наш канал</td></tr>
+        <tr><td>Паушальный взнос</td><td>500K – 2M ₽</td><td class="highlight">от 100K ₽ по акции</td></tr>
+        <tr><td>Второй поток дохода</td><td>Нет</td><td class="highlight">Lendo · до 4%</td></tr>
+        <tr><td>Ассортимент</td><td>Только новое</td><td class="highlight">Новое · Re:Set · Trade-In</td></tr>
+      </tbody>
+    </table>
+    <footer class="slide-foot"><span>re:bar</span><span>04 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 05 DOUBLE -->
+<section class="slide dark" data-slide="5">
+  <div class="slide-inner">
+    <span class="eyebrow">04 · как зарабатывает точка</span>
+    <h2 class="serif">Наценка на технике плюс кредитование. Один магазин — два источника денег.</h2>
+    <div class="cols-2">
+      <div class="card"><div class="card-num">01 · продажа</div><h3>Наценка на товаре</h3><p>Оригинальная техника Apple и Samsung, Re:Set с гарантией, аксессуары — маржа заложена в модель.</p></div>
+      <div class="card"><div class="card-num">02 · кредит</div><h3>Вознаграждение Lendo</h3><p>Каждая одобренная рассрочка или кредит — дополнительный доход без роста складских рисков.</p></div>
+    </div>
+    <footer class="slide-foot"><span>re:bar</span><span>05 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 06 CATEGORIES -->
+<section class="slide" data-slide="6">
+  <div class="slide-inner">
+    <span class="eyebrow">05 · витрина</span>
+    <h2 class="serif">Шесть категорий — один зал.</h2>
+    <p class="sub">Новое, Re:Set с гарантией и Trade-In в одном пространстве. Клиент приходит за одним — уходит с двумя.</p>
+    <div class="cols-3" style="grid-template-columns:repeat(3,1fr);margin-top:1rem">
+      <div class="card"><div class="card-num">01</div><h3>iPhone</h3><p>Новое + Re:Set</p></div>
+      <div class="card"><div class="card-num">02</div><h3>MacBook / iMac</h3><p>Витрина и заказ</p></div>
+      <div class="card"><div class="card-num">03</div><h3>iPad</h3><p>Apple, Samsung</p></div>
+      <div class="card"><div class="card-num">04</div><h3>Apple Watch</h3><p>Galaxy Watch</p></div>
+      <div class="card"><div class="card-num">05</div><h3>AirPods</h3><p>Sony, JBL, Beats</p></div>
+      <div class="card"><div class="card-num">06</div><h3>Аксессуары</h3><p>Кейсы, зарядки</p></div>
+    </div>
+    <footer class="slide-foot"><span>re:bar</span><span>06 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 07 FORMATS -->
+<section class="slide" data-slide="7">
+  <div class="slide-inner">
+    <span class="eyebrow">06 · форматы точек</span>
+    <h2 class="serif">Три формата — выбор партнёра</h2>
+    <div class="cols-3">
+      <div class="card"><div class="card-num">формат 01 · вход</div><h3>Пункт выдачи</h3><p>1–1,5 млн ₽ · 20 м²<br>Паушал 250K · выручка 1–1,3M/мес<br>Окупаемость от 8 мес</p></div>
+      <div class="card"><div class="card-num">формат 02 · базовый</div><h3>Стандарт</h3><p>2–3,5 млн ₽ · 50–80 м²<br>Паушал 500K · выручка 3–4M/мес<br>Окупаемость от 6 мес</p></div>
+      <div class="card"><div class="card-num">формат 03 · максимум</div><h3>Флагман</h3><p>7–8 млн ₽ · 100–120 м²<br>Паушал 950K · выручка 6–7M/мес<br>Окупаемость от 4 мес</p></div>
+    </div>
+    <footer class="slide-foot"><span>re:bar</span><span>07 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 08 UNIT -->
+<section class="slide dark" data-slide="8">
+  <div class="slide-inner">
+    <span class="eyebrow">07 · юнит-экономика</span>
+    <h2 class="serif">Пример: флагман Улан-Удэ · факт</h2>
+    <p class="sub">Окупаемость из действующей точки — не с презентации.</p>
+    <div class="stat-grid">
+      <div class="stat"><div class="val">7,5M</div><div class="lbl">инвестиции</div></div>
+      <div class="stat" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)"><div class="val">6,5M</div><div class="lbl">выручка/мес</div></div>
+      <div class="stat" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)"><div class="val">≈950K</div><div class="lbl">чистая/мес</div></div>
+      <div class="stat" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)"><div class="val">+130K</div><div class="lbl">кредитование</div></div>
+    </div>
+    <footer class="slide-foot"><span>re:bar</span><span>08 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 09 STEPS -->
+<section class="slide" data-slide="9">
+  <div class="slide-inner">
+    <span class="eyebrow">08 · запуск под ключ</span>
+    <h2 class="serif">Пять шагов — от заявки до первой выручки</h2>
+    <div class="steps">
+      <div class="step"><div class="n">01</div><h4>Заявка и созвон</h4><p>Модель под ваш город, реальная экономика</p><div class="t">1–2 дня</div></div>
+      <div class="step"><div class="n">02</div><h4>Договор</h4><p>Лицензия, закупка, услуги — прозрачно</p><div class="t">3–5 дней</div></div>
+      <div class="step"><div class="n">03</div><h4>Помещение</h4><p>Локация, товарный запас, канал закупки</p><div class="t">до 3 недель</div></div>
+      <div class="step"><div class="n">04</div><h4>Ремонт</h4><p>Дизайн-проект, брендирование, вывеска</p><div class="t">3–4 недели</div></div>
+      <div class="step"><div class="n">05</div><h4>Открытие</h4><p>Обучение, маркетинг, event с куратором</p><div class="t">1–2 недели</div></div>
+    </div>
+    <p class="sub" style="margin-top:1rem;font-size:.6875rem">Детальный календарь — на следующем слайде (гантт 60–90 дней).</p>
+    <footer class="slide-foot"><span>re:bar</span><span>09 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 10 TRACTION -->
+<section class="slide" data-slide="10">
+  <div class="slide-inner">
+    <span class="eyebrow">09 · traction</span>
+    <h2 class="serif">Две действующие точки. Сеть с 2021.</h2>
+    <div class="traction">
+      <div class="store-card">
+        <div class="city">Улан-Удэ</div>
+        <div class="addr">КТК «Гэлакси», 3 этаж · с 2025 · 35 м²</div>
+        <div class="store-stats">
+          <div class="store-stat"><div class="v">6,5M ₽</div><div class="l">выручка/мес</div></div>
+          <div class="store-stat"><div class="v">≈950K ₽</div><div class="l">чистая/мес</div></div>
+          <div class="store-stat"><div class="v">≈130K ₽</div><div class="l">кредитование</div></div>
+          <div class="store-stat"><div class="v">с 2025</div><div class="l">работает</div></div>
+        </div>
+      </div>
+      <div class="store-card">
+        <div class="city">Иркутск</div>
+        <div class="addr">Богдана Хмельницкого, 3 · с 2021 · 50 м²</div>
+        <div class="store-stats">
+          <div class="store-stat"><div class="v">4,0M ₽</div><div class="l">выручка/мес</div></div>
+          <div class="store-stat"><div class="v">≈550K ₽</div><div class="l">чистая/мес</div></div>
+          <div class="store-stat"><div class="v">≈80K ₽</div><div class="l">кредитование</div></div>
+          <div class="store-stat"><div class="v">5 лет</div><div class="l">без сбоев</div></div>
+        </div>
+      </div>
+    </div>
+    <footer class="slide-foot"><span>re:bar</span><span>10 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 11 PLAN -->
+<section class="slide dark" data-slide="11">
+  <div class="slide-inner">
+    <span class="eyebrow">10 · план развития</span>
+    <h2 class="serif">2026–2027 · масштабирование по Сибири и Дальнему Востоку</h2>
+    <div class="stat-grid" style="margin-top:2rem">
+      <div class="stat" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)"><div class="val">+3</div><div class="lbl">2026 Q1–Q2</div></div>
+      <div class="stat" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)"><div class="val">+4</div><div class="lbl">2026 Q3–Q4</div></div>
+      <div class="stat" style="background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12)"><div class="val">+8</div><div class="lbl">2027 план</div></div>
+      <div class="stat" style="background:var(--paper);color:var(--ink)"><div class="val">17</div><div class="lbl" style="color:var(--steel)">цель · точек</div></div>
+    </div>
+    <footer class="slide-foot"><span>re:bar</span><span>11 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 12 PROMO -->
+<section class="slide" data-slide="12">
+  <div class="slide-inner">
+    <span class="eyebrow">11 · акция запуска</span>
+    <h2 class="serif">Только первым 3 договорам — паушал 100 000 ₽</h2>
+    <div class="promo-grid">
+      <div class="promo-card"><div class="card-num">пункт выдачи</div><div class="was">250 000 ₽</div><div class="now">100 000 ₽</div><div class="save">− 150 000 ₽</div></div>
+      <div class="promo-card" style="border-color:var(--ink)"><div class="card-num">стандарт · популярный</div><div class="was">500 000 ₽</div><div class="now">100 000 ₽</div><div class="save">− 400 000 ₽</div></div>
+      <div class="promo-card"><div class="card-num">флагман</div><div class="was">950 000 ₽</div><div class="now">100 000 ₽</div><div class="save">− 850 000 ₽</div></div>
+    </div>
+    <p class="sub" style="margin-top:1rem;font-size:.75rem">Осталось 3 из 3 · условия действуют до подписания первых трёх договоров</p>
+    <footer class="slide-foot"><span>re:bar</span><span>12 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 13 FOUNDER -->
+<section class="slide" data-slide="13">
+  <div class="slide-inner">
+    <span class="eyebrow">12 · основатель</span>
+    <h2 class="serif">Дамдин Цыпылов</h2>
+    <div class="cols-2">
+      <div>
+        <p class="sub" style="max-width:none">Основатель сети. Первый магазин открыл в Иркутске в 2021, флагман в Улан-Удэ — в 2025. Прозрачная экономика без роялти, партнёрство с Lendo и канал закупки оригинала с гарантией до 2 лет.</p>
+        <div class="contacts" style="margin-top:1rem">
+          <div class="contact"><strong>Telegram</strong>@damdiin</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-num">ключевые вехи</div>
+        <p style="font-size:.6875rem;line-height:1.6;color:var(--steel)">
+          2021 — Иркутск<br>
+          2022 — Re:Set<br>
+          2025 — флагман Улан-Удэ<br>
+          2024 — Lendo<br>
+          2025 — 20K Instagram<br>
+          2026 — ребрендинг re:bar · франшиза
+        </p>
+      </div>
+    </div>
+    <footer class="slide-foot"><span>re:bar</span><span>13 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 14 ORG -->
+<section class="slide" data-slide="14">
+  <div class="slide-inner">
+    <span class="eyebrow">13 · управляющая компания <span class="tag-new">new</span></span>
+    <h2 class="serif">Оргструктура УК — кто ведёт ваш запуск</h2>
+    <div class="org">
+      <div class="org-tree">
+        <div class="org-node ceo"><div class="role">Founder / CEO · Дамдин Цыпылов</div><div class="desc">Стратегия, ключевые Zoom, лицо бренда, финальные решения</div></div>
+        <div class="org-branch">
+          <div class="org-node"><div class="role">Менеджер-консультант</div><div class="desc">Заявки, CRM, дожим</div></div>
+          <div class="org-node"><div class="role">Куратор запуска</div><div class="desc">От подписания до первых чеков</div></div>
+          <div class="org-node"><div class="role">Маркетолог УК</div><div class="desc">Реклама, контент, аналитика</div></div>
+        </div>
+        <div class="org-branch" style="grid-template-columns:repeat(3,1fr)">
+          <div class="org-node"><div class="role">Юрист</div><div class="desc">Аутсорс · договоры</div></div>
+          <div class="org-node"><div class="role">Бухгалтер</div><div class="desc">Аутсорс · учёт ООО</div></div>
+          <div class="org-node"><div class="role">Дизайнер</div><div class="desc">Аутсорс · проекты точек</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-num">y2 · при 12+ партнёрах</div>
+        <p style="font-size:.6875rem;line-height:1.55;color:var(--steel)">
+          РОП · второй менеджер · второй куратор · куратор действующих партнёров · ассистент founder · логист/закупщик
+        </p>
+        <p style="font-size:.625rem;margin-top:.75rem;color:var(--steel-lo)">Y1 — минимум 4 in-house + аутсорс. Каждый партнёр закреплён за куратором на 90 дней.</p>
+      </div>
+    </div>
+    <footer class="slide-foot"><span>re:bar</span><span>14 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 15 GANTT -->
+<section class="slide" data-slide="15">
+  <div class="slide-inner">
+    <span class="eyebrow">14 · план запуска <span class="tag-new">new</span></span>
+    <h2 class="serif" style="font-size:1.75rem">Гантт 60–90 дней · от подписания до первых чеков</h2>
+    <div class="gantt">
+      <div class="gantt-row"><div class="gantt-label">Kick-off</div><div class="gantt-bar-wrap"><div class="gantt-bar" style="left:0%;width:5%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label">ИП / р/с</div><div class="gantt-bar-wrap"><div class="gantt-bar" style="left:5%;width:12%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label">Поиск помещения</div><div class="gantt-bar-wrap"><div class="gantt-bar crit" style="left:8%;width:33%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label">Утверждение локации</div><div class="gantt-bar-wrap"><div class="gantt-bar" style="left:38%;width:8%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label">Договор аренды</div><div class="gantt-bar-wrap"><div class="gantt-bar" style="left:46%;width:8%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label">Дизайн-проект</div><div class="gantt-bar-wrap"><div class="gantt-bar" style="left:46%;width:13%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label">Ремонт</div><div class="gantt-bar-wrap"><div class="gantt-bar crit" style="left:55%;width:32%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label">Брендирование</div><div class="gantt-bar-wrap"><div class="gantt-bar" style="left:80%;width:13%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label">Закуп ассортимента</div><div class="gantt-bar-wrap"><div class="gantt-bar" style="left:75%;width:20%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label">Обучение</div><div class="gantt-bar-wrap"><div class="gantt-bar" style="left:88%;width:10%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label">Маркетинг ramp-up</div><div class="gantt-bar-wrap"><div class="gantt-bar" style="left:83%;width:22%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label">🎉 Открытие D60</div><div class="gantt-bar-wrap"><div class="gantt-bar open" style="left:100%;width:2%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label">Куратор D60–90</div><div class="gantt-bar-wrap"><div class="gantt-bar" style="left:100%;width:50%"></div></div></div>
+    </div>
+    <div class="gantt-legend">
+      <span class="n">стандартный этап</span>
+      <span class="c">критический путь</span>
+      <span class="o">открытие</span>
+      <span style="margin-left:auto">60 дн — агрессивно · 90 дн — реалистично</span>
+    </div>
+    <footer class="slide-foot"><span>re:bar</span><span>15 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 16 MARKETING -->
+<section class="slide" data-slide="16">
+  <div class="slide-inner">
+    <span class="eyebrow">15 · поддержка <span class="tag-new">new</span></span>
+    <h2 class="serif" style="font-size:1.75rem">Маркетинговая поддержка партнёров</h2>
+    <div class="cols-2">
+      <div>
+        <div class="card" style="margin-bottom:.5rem"><div class="card-num">включено в паушал</div>
+          <p style="font-size:.6875rem;line-height:1.55;color:var(--steel)">Пакет открытия · шаблоны SMM · методичка · прогрев соцсетей за 2 нед · event-скрипт дня открытия</p>
+        </div>
+        <div class="card"><div class="card-num">опционально</div>
+          <p style="font-size:.6875rem;line-height:1.55;color:var(--steel)">Маркетинг 10–30K/мес · посевы у блогеров · доп. креативы</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-num">каналы лидогенерации УК</div>
+        <p style="font-size:.6875rem;line-height:1.55;color:var(--steel)">Яндекс.Директ · VK · каталоги франшиз · Telegram founder · Instagram · YouTube · события · Lendo / банки</p>
+        <p style="font-size:.625rem;margin-top:.5rem;color:var(--steel-lo)">Эксклюзив по городу для партнёра — до 500K населения 1 город = 1 партнёр</p>
+      </div>
+    </div>
+    <footer class="slide-foot"><span>re:bar</span><span>16 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 17 FAQ -->
+<section class="slide" data-slide="17">
+  <div class="slide-inner">
+    <span class="eyebrow">16 · вопросы <span class="tag-new">new</span></span>
+    <h2 class="serif" style="font-size:1.75rem">FAQ — ответы на главные вопросы</h2>
+    <div class="faq-list">
+      <div class="faq-item"><h4>Сколько окупается точка?</h4><p>Флагман 10–14 мес · Стандарт 5–8 мес · Пункт выдачи 10–14 мес (с ramp-up).</p></div>
+      <div class="faq-item"><h4>Есть ли роялти?</h4><p>0% ежемесячных. УК — паушал + маржа на закупках.</p></div>
+      <div class="faq-item"><h4>Что даёте за паушал?</h4><p>Юр. упаковка, локация, дизайн, ассортимент, обучение, маркет-пакет, куратор 90 дней.</p></div>
+      <div class="faq-item"><h4>Сколько зарабатывают точки?</h4><p>Улан-Удэ ≈950K + 130K · Иркутск ≈550K + 80K кредитование.</p></div>
+      <div class="faq-item"><h4>Кто ищет помещение?</h4><p>Партнёр по чек-листу, куратор УК утверждает. Плохую локацию не согласуем.</p></div>
+      <div class="faq-item"><h4>Эксклюзив на город?</h4><p>До 500K — 1 партнёр = 1 город. В миллионниках — эксклюзив на район.</p></div>
+      <div class="faq-item" style="grid-column:1/-1"><h4>Что если разойдёмся?</h4><p>Процедура в договоре. Паушал не возвращается. Оборудование и товар остаются у партнёра. Полный FAQ — 20 вопросов в методичке.</p></div>
+    </div>
+    <footer class="slide-foot"><span>re:bar</span><span>17 / 18</span></footer>
+  </div>
+</section>
+
+<!-- 18 CTA -->
+<section class="slide dark" data-slide="18">
+  <div class="slide-inner">
+    <span class="eyebrow">17 · следующий шаг <span class="tag-new">new</span></span>
+    <h2 class="serif">Посчитаем вашу точку вместе</h2>
+    <p class="sub">Оставьте контакт — соберём модель под ваш город с учётом кредитного дохода и покажем срок окупаемости.</p>
+    <div class="cta-box">
+      <div class="cta-promo">
+        <div style="font-size:.625rem;text-transform:uppercase;letter-spacing:.1em;opacity:.7">промо · первым 3 договорам</div>
+        <div class="big">100 000 ₽</div>
+        <div style="font-size:.875rem;opacity:.8">паушальный взнос вместо 250K–950K</div>
+        <div class="urgent">осталось 3 из 3 · условия до подписания</div>
+      </div>
+      <div>
+        <div class="cta-steps">
+          <div class="cta-step"><span class="num">1</span><span>Заявка или сообщение в Telegram @damdiin</span></div>
+          <div class="cta-step"><span class="num">2</span><span>Созвон 15 мин — квалификация</span></div>
+          <div class="cta-step"><span class="num">3</span><span>Zoom 45 мин с founder — финмодель под город</span></div>
+          <div class="cta-step"><span class="num">4</span><span>Договор + старт гантта 60–90 дней</span></div>
+        </div>
+        <div class="contacts" style="margin-top:1rem">
+          <div class="contact"><strong>Telegram</strong>@damdiin</div>
+          <div class="contact"><strong>Instagram</strong>@applebar.ru · 20,1K</div>
+          <div class="contact"><strong>Сайт</strong>rebar.pro</div>
+        </div>
+      </div>
+    </div>
+    <footer class="slide-foot"><span>re:bar · инвестиционный меморандум v5</span><span>18 / 18</span></footer>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function(){
+  const slides = [...document.querySelectorAll('.slide')];
+  const countEl = document.getElementById('count');
+  let i = 0;
+  function show(n){
+    i = (n + slides.length) % slides.length;
+    slides.forEach((s,j)=>s.classList.toggle('active', j===i));
+    countEl.textContent = (i+1) + ' / ' + slides.length;
+    history.replaceState(null,'','#slide-'+(i+1));
+  }
+  document.getElementById('prev').onclick = ()=>show(i-1);
+  document.getElementById('next').onclick = ()=>show(i+1);
+  document.addEventListener('keydown', e=>{
+    if(e.key==='ArrowRight'||e.key===' ') { e.preventDefault(); show(i+1); }
+    if(e.key==='ArrowLeft') show(i-1);
+    if(e.key==='Home') show(0);
+    if(e.key==='End') show(slides.length-1);
+  });
+  const hash = location.hash.match(/slide-(\d+)/);
+  if(hash) show(+hash[1]-1);
+})();
+</script>
+</body>
+</html>

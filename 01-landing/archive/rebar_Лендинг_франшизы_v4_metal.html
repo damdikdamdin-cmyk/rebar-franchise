@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rebar — франшиза электроники, которая окупается</title>
+<meta name="description" content="Франшиза магазина электроники rebar. 0% роялти через наш канал закупки, второй поток дохода на кредитовании, оригинальная техника с гарантией. Окупаемость от 4 месяцев.">
+<meta property="og:title" content="rebar — франшиза электроники, которая окупается">
+<meta property="og:description" content="0% роялти · второй поток дохода на кредитовании · оригинальная техника с гарантией. Окупаемость от 4 мес.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    /* Металлическая монохромная палитра */
+    --paper:      #f6f6f4;
+    --paper-2:    #eeeeeb;
+    --paper-3:    #e5e5e2;
+    --ink:        #0a0b0d;
+    --ink-2:      #3a3c40;
+    --steel:      #6b7076;
+    --steel-lo:   #a3a7ad;
+    --line:       rgba(10,11,13,.09);
+    --line-2:     rgba(10,11,13,.16);
+    --line-dark:  rgba(255,255,255,.10);
+    --line-dark-2:rgba(255,255,255,.20);
+    --ok:         #1f6b3a;
+
+    /* Полированная сталь — сигнатура */
+    --chrome: linear-gradient(180deg,
+                #c8ccd1 0%, #f2f3f5 22%, #a3a7ad 48%,
+                #eef0f2 74%, #b8bcc2 100%);
+    --chrome-h: linear-gradient(90deg,
+                #b8bcc2 0%, #f2f3f5 24%, #a3a7ad 50%,
+                #eef0f2 76%, #c8ccd1 100%);
+
+    /* Тонкая шумовая текстура для «матового» ощущения на светлом */
+    --noise: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.04 0 0 0 0 0.04 0 0 0 0 0.05 0 0 0 .05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background: var(--paper);
+    background-image: var(--noise);
+    color: var(--ink);
+    font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    font-weight:400;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:0 32px}
+  a{color:inherit; text-decoration:none}
+  .ic{width:1em;height:1em;vertical-align:-.125em;flex-shrink:0}
+  ::selection{background:var(--ink); color:var(--paper)}
+
+  /* === TYPO === */
+  .serif{font-family:'Instrument Serif', 'Times New Roman', serif; font-weight:400; letter-spacing:-.005em; line-height:1.02}
+  .serif i, .italic-serif{font-style:italic}
+  .mono{font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-feature-settings:'tnum' 1, 'ss01' 1; letter-spacing:-.01em}
+  .eyebrow{font-size:12px; letter-spacing:.20em; text-transform:uppercase; color:var(--steel); font-weight:600; font-family:'JetBrains Mono',ui-monospace,monospace}
+  .eyebrow.dark{color:var(--steel-lo)}
+
+  h1,h2,h3{font-family:'Instrument Serif', serif; font-weight:400; line-height:1.03; letter-spacing:-.01em}
+  h1{font-size:clamp(48px, 7vw, 96px)}
+  h2{font-size:clamp(36px, 5vw, 64px)}
+  h3{font-family:'Manrope',sans-serif; font-weight:700; font-size:20px; letter-spacing:-.01em; line-height:1.35}
+
+  /* === SIGNATURE: rebar-rod === */
+  .rod{
+    display:inline-block; width:3px; height:1.1em; align-self:center;
+    background: var(--chrome); border-radius:1px;
+    box-shadow: 0 0 0 .5px rgba(10,11,13,.12), inset 0 0 0 .5px rgba(255,255,255,.5);
+    position:relative;
+  }
+  .rod::before, .rod::after{
+    content:""; position:absolute; left:-2px; right:-2px; height:2px;
+    background: linear-gradient(90deg, transparent, rgba(10,11,13,.35), transparent);
+  }
+  .rod::before{top:32%}
+  .rod::after{top:66%}
+  .rod-h{display:inline-block; width:44px; height:3px; background:var(--chrome-h); border-radius:2px; box-shadow:0 0 0 .5px rgba(10,11,13,.12), inset 0 0 0 .5px rgba(255,255,255,.5); vertical-align:middle}
+
+  /* === NAV === */
+  nav{
+    position:sticky; top:0; z-index:50;
+    background:rgba(246,246,244,.86); backdrop-filter:blur(14px) saturate(1.1);
+    border-bottom:1px solid var(--line);
+  }
+  .nav-in{display:flex; align-items:center; justify-content:space-between; height:68px}
+  .logo{font-family:'Instrument Serif',serif; font-weight:400; font-size:28px; letter-spacing:-.02em; display:flex; align-items:center; gap:6px}
+  .logo .dot{width:8px; height:8px; border-radius:50%; background:var(--chrome); box-shadow:0 0 0 .5px rgba(10,11,13,.35); display:inline-block; margin-bottom:4px}
+  .nav-links{display:flex; gap:34px; font-size:14px; color:var(--steel); font-weight:500}
+  .nav-links a{transition:color .15s}
+  .nav-links a:hover{color:var(--ink)}
+  .nav-cta{
+    border:1px solid var(--line-2); padding:10px 20px; border-radius:100px;
+    font-size:14px; font-weight:600; transition:all .2s; background:var(--paper);
+  }
+  .nav-cta:hover{background:var(--ink); color:var(--paper); border-color:var(--ink)}
+  @media(max-width:820px){.nav-links{display:none}}
+
+  /* === BUTTONS === */
+  .btn{
+    display:inline-flex; align-items:center; gap:10px;
+    font-family:'Manrope',sans-serif; font-weight:600; font-size:16px;
+    padding:16px 30px; border-radius:100px; transition:all .2s;
+    cursor:pointer; border:none; letter-spacing:-.01em;
+  }
+  .btn .ic{width:18px;height:18px}
+  .btn-primary{background:var(--ink); color:var(--paper)}
+  .btn-primary:hover{transform:translateY(-1px); box-shadow:0 12px 30px -8px rgba(10,11,13,.35)}
+  .btn-ghost{border:1px solid var(--line-2); color:var(--ink); background:transparent}
+  .btn-ghost:hover{border-color:var(--ink); background:var(--paper-2)}
+  .btn-chrome{
+    background: var(--chrome-h); color:var(--ink);
+    box-shadow: 0 0 0 .5px rgba(10,11,13,.35), inset 0 1px 0 rgba(255,255,255,.7), 0 8px 24px -10px rgba(10,11,13,.4);
+    font-weight:700;
+  }
+  .btn-chrome:hover{transform:translateY(-1px)}
+
+  /* === HERO === */
+  .hero{position:relative; padding:88px 0 96px}
+  .hero-in{display:grid; grid-template-columns:1.15fr .85fr; gap:64px; align-items:end}
+  .hero-eyebrow{display:flex; align-items:center; gap:14px; margin-bottom:36px}
+  .hero-h{position:relative; margin-bottom:32px}
+  .hero-h .rod{position:absolute; left:-28px; top:.1em; height:.92em}
+  .hero-h .italic-serif{color:var(--ink); position:relative}
+  .hero-h em{font-style:italic; color:var(--ink-2)}
+  .hero-sub{font-size:clamp(17px,1.5vw,20px); color:var(--ink-2); max-width:540px; margin-bottom:40px; line-height:1.5}
+  .hero-sub b{color:var(--ink); font-weight:600; border-bottom:1px solid var(--line-2)}
+  .hero-cta{display:flex; gap:14px; flex-wrap:wrap; align-items:center}
+
+  .hero-marks{display:grid; grid-template-columns:repeat(4,1fr); gap:0; margin-top:64px; border-top:1px solid var(--line); padding-top:24px}
+  .hero-mark{padding-right:20px; border-right:1px solid var(--line)}
+  .hero-mark:last-child{border-right:none}
+  .hero-mark .n{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:26px; letter-spacing:-.03em; color:var(--ink); line-height:1}
+  .hero-mark .n small{font-size:14px; color:var(--steel); font-weight:500; margin-left:2px}
+  .hero-mark .l{font-size:12px; color:var(--steel); margin-top:8px; letter-spacing:.02em; line-height:1.3}
+
+  /* === HERO CARD: chrome === */
+  .hcard{
+    position:relative; padding:32px; border-radius:22px;
+    background: linear-gradient(180deg, #ffffff 0%, #ececea 100%);
+    border:1px solid var(--line-2);
+    box-shadow:
+      0 40px 80px -30px rgba(10,11,13,.25),
+      0 4px 12px -2px rgba(10,11,13,.06),
+      inset 0 1px 0 rgba(255,255,255,.9);
+  }
+  .hcard::before{
+    content:""; position:absolute; top:0; left:24px; right:24px; height:1px;
+    background: linear-gradient(90deg, transparent, rgba(10,11,13,.25), transparent);
+  }
+  .hcard-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:24px}
+  .hcard-tag{font-size:12px; color:var(--steel); font-weight:600; display:flex; align-items:center; gap:10px; letter-spacing:.02em}
+  .hcard-tag .ic{color:var(--ink); width:16px; height:16px}
+  .hcard-live{font-size:10px; color:var(--ok); font-weight:700; display:flex; align-items:center; gap:6px; letter-spacing:.14em; text-transform:uppercase; font-family:'JetBrains Mono',monospace}
+  .hcard-live::before{content:""; width:6px; height:6px; border-radius:50%; background:var(--ok); animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .hcard-lbl{font-size:12px; color:var(--steel); font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.12em; margin-bottom:6px}
+  .hcard-rev{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:38px; letter-spacing:-.03em; color:var(--ink); line-height:1; margin-bottom:20px}
+  .hcard-rev small{font-size:18px; color:var(--steel); font-weight:500; letter-spacing:0}
+  .hcard-bar{height:4px; background:var(--paper-3); border-radius:2px; overflow:hidden; margin-bottom:28px; position:relative}
+  .hcard-bar i{display:block; height:100%; width:84%; background:var(--chrome-h); border-radius:2px; box-shadow:inset 0 0 0 .5px rgba(10,11,13,.15); animation:grow 1.4s cubic-bezier(.16,1,.3,1) both}
+  @keyframes grow{from{width:0}}
+  .hcard-row{display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-top:1px solid var(--line); font-size:14px}
+  .hcard-row .k{color:var(--steel); display:flex; align-items:center; gap:10px; font-weight:500}
+  .hcard-row .k .ic{width:14px; height:14px; color:var(--steel-lo)}
+  .hcard-row .v{font-weight:700; font-family:'JetBrains Mono',monospace; letter-spacing:-.01em}
+  .hcard-row.free .v{color:var(--ok)}
+  .hcard-note{font-size:12px; color:var(--steel); margin-top:18px; line-height:1.5; padding-top:14px; border-top:1px solid var(--line)}
+
+  @media(max-width:900px){
+    .hero-in{grid-template-columns:1fr; gap:56px; align-items:stretch}
+    .hero-h .rod{display:none}
+    .hero-marks{grid-template-columns:repeat(2,1fr); gap:20px 0; padding-top:20px}
+    .hero-mark{border-right:none; padding:14px 0; border-top:1px solid var(--line)}
+    .hero-mark:nth-child(-n+2){border-top:none; padding-top:4px}
+  }
+
+  /* === SECTIONS === */
+  section{position:relative}
+  .sec{padding:100px 0}
+  .sec-head{max-width:820px; margin-bottom:56px}
+  .sec-label{display:flex; align-items:center; gap:14px; margin-bottom:20px}
+  .sec-h{margin-bottom:20px}
+  .sec-h em{font-style:italic; color:var(--ink-2)}
+  .sec-lead{font-size:19px; color:var(--ink-2); max-width:640px; line-height:1.55}
+
+  .strip{background:var(--paper-2); border-top:1px solid var(--line); border-bottom:1px solid var(--line)}
+  .strip-dark{background:var(--ink); color:var(--paper); border-top:1px solid var(--ink); border-bottom:1px solid var(--ink)}
+  .strip-dark .sec-h em{color:var(--steel-lo)}
+  .strip-dark .sec-lead{color:var(--steel-lo)}
+
+  /* === PROBLEMS === */
+  .prob-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:0; border-top:1px solid var(--line-2); border-bottom:1px solid var(--line-2)}
+  .prob{padding:44px 32px 44px 0; border-right:1px solid var(--line); position:relative}
+  .prob:last-child{border-right:none; padding-right:0}
+  .prob:not(:first-child){padding-left:32px}
+  .prob .num{font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--steel); font-weight:500; letter-spacing:.1em; margin-bottom:16px}
+  .prob .ic{width:22px;height:22px;color:var(--ink);display:block;margin-bottom:14px; stroke-width:1.4}
+  .prob h3{font-family:'Instrument Serif',serif; font-weight:400; font-size:28px; letter-spacing:-.01em; margin-bottom:12px; line-height:1.1}
+  .prob p{font-size:15px; color:var(--ink-2); line-height:1.55}
+  @media(max-width:820px){
+    .prob-grid{grid-template-columns:1fr}
+    .prob{border-right:none; border-bottom:1px solid var(--line); padding:32px 0 !important}
+    .prob:last-child{border-bottom:none}
+  }
+
+  /* === CALC === */
+  .calc-wrap{
+    background:var(--paper);
+    border:1px solid var(--line-2); border-radius:24px;
+    padding:44px; display:grid; grid-template-columns:1fr 1fr; gap:52px; align-items:stretch;
+    box-shadow: 0 4px 24px -8px rgba(10,11,13,.08);
+  }
+  .calc-controls{display:flex; flex-direction:column}
+  .calc-controls .cc-h{font-size:13px; color:var(--steel); font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.14em; margin-bottom:20px}
+  .calc-controls label{display:block; font-size:14px; color:var(--ink); margin-bottom:12px; margin-top:24px; font-weight:600}
+  .calc-controls label:first-of-type{margin-top:0}
+  .calc-val{color:var(--ink); font-weight:700; font-family:'JetBrains Mono',monospace; font-size:15px; float:right; letter-spacing:-.01em}
+  input[type=range]{-webkit-appearance:none; appearance:none; width:100%; height:3px; border-radius:2px; background:var(--paper-3); outline:none}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:22px; height:22px; border-radius:50%;
+    background:var(--chrome); cursor:pointer;
+    border:0; box-shadow: 0 0 0 .5px rgba(10,11,13,.35), 0 2px 6px rgba(10,11,13,.2), inset 0 1px 0 rgba(255,255,255,.6);
+  }
+  input[type=range]::-moz-range-thumb{width:22px; height:22px; border-radius:50%; background:var(--chrome); cursor:pointer; border:0; box-shadow: 0 0 0 .5px rgba(10,11,13,.35)}
+  .seg{display:flex; gap:0; margin-top:4px; border:1px solid var(--line-2); border-radius:100px; padding:3px; background:var(--paper-2)}
+  .seg button{
+    flex:1; background:transparent; border:none; color:var(--steel);
+    padding:10px 6px; border-radius:100px; font-size:13px; font-weight:600;
+    cursor:pointer; font-family:'Manrope',sans-serif; transition:.15s;
+  }
+  .seg button.on{background:var(--ink); color:var(--paper); box-shadow:0 2px 8px -2px rgba(10,11,13,.3)}
+
+  /* Тёмный результат — контраст */
+  .calc-out{
+    background:var(--ink); color:var(--paper);
+    border-radius:20px; padding:36px; display:flex; flex-direction:column;
+    position:relative; overflow:hidden;
+  }
+  .calc-out::before{
+    content:""; position:absolute; top:0; left:24px; right:24px; height:1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+  }
+  .calc-out .cap{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--steel-lo); font-weight:600; font-family:'JetBrains Mono',monospace}
+  .calc-big{font-family:'Instrument Serif',serif; font-weight:400; font-size:clamp(72px,10vw,120px); letter-spacing:-.03em; margin:12px 0 6px; color:var(--paper); line-height:.95}
+  .calc-big small{font-family:'Manrope',sans-serif; font-size:22px; color:var(--steel-lo); font-weight:500; letter-spacing:0; margin-left:6px}
+  .calc-sub{font-size:16px; color:var(--paper); font-weight:500; font-family:'JetBrains Mono',monospace; letter-spacing:-.01em}
+  .calc-rows{margin-top:28px; border-top:1px solid var(--line-dark); padding-top:20px; display:flex; flex-direction:column; gap:2px}
+  .calc-row{display:flex; justify-content:space-between; font-size:14px; padding:8px 0}
+  .calc-row span:first-child{color:var(--steel-lo)}
+  .calc-row span:last-child{font-weight:700; font-family:'JetBrains Mono',monospace}
+  .calc-row.free span:last-child{color:#7ee0a1}
+  .calc-note{font-size:12px; color:var(--steel-lo); margin-top:20px; line-height:1.5; padding-top:16px; border-top:1px solid var(--line-dark)}
+  @media(max-width:900px){.calc-wrap{grid-template-columns:1fr; padding:30px; gap:32px}}
+
+  /* === PILL GRID === */
+  .pill-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:24px}
+  .pill{
+    border:1px solid var(--line); border-radius:20px; padding:36px 34px;
+    background:var(--paper); transition:all .2s; position:relative;
+  }
+  .pill:hover{border-color:var(--ink); transform:translateY(-2px); box-shadow:0 12px 30px -12px rgba(10,11,13,.2)}
+  .pill .idx{
+    font-family:'JetBrains Mono',monospace; font-weight:500; font-size:12px;
+    color:var(--steel); letter-spacing:.12em; text-transform:uppercase;
+    display:flex; align-items:center; gap:10px; margin-bottom:20px;
+  }
+  .pill .idx::before{
+    content:""; width:24px; height:1px; background:var(--ink);
+  }
+  .pill h3{font-family:'Instrument Serif',serif; font-weight:400; font-size:32px; letter-spacing:-.01em; margin:0 0 14px; line-height:1.1}
+  .pill p{font-size:15px; color:var(--ink-2); line-height:1.6}
+  @media(max-width:760px){.pill-grid{grid-template-columns:1fr}}
+
+  /* === FEATURE (Re:Set / Lendo) === */
+  .feat{border-top:1px solid var(--line); border-bottom:1px solid var(--line); background:var(--paper)}
+  .feat-in{display:grid; grid-template-columns:1.05fr .95fr; gap:64px; align-items:center}
+  .feat-badge{
+    display:inline-flex; align-items:center; gap:10px;
+    font-family:'JetBrains Mono',monospace; font-weight:500; font-size:11px;
+    color:var(--ink); letter-spacing:.14em; text-transform:uppercase;
+    padding:8px 14px; border-radius:100px; border:1px solid var(--line-2);
+    background:var(--paper); margin-bottom:24px;
+  }
+  .feat-badge::before{content:""; display:inline-block; width:20px; height:2px; background:var(--chrome-h); border-radius:2px; box-shadow:0 0 0 .5px rgba(10,11,13,.15)}
+  .feat h2{margin-bottom:24px; position:relative; padding-left:0}
+  .feat h2 em{font-style:italic; color:var(--ink-2)}
+  .feat .h-rod{display:flex; align-items:flex-start; gap:20px}
+  .feat .h-rod .rod{align-self:flex-start; height:1.2em; margin-top:.15em}
+  .feat p{color:var(--ink-2); font-size:17px; line-height:1.65; margin-bottom:16px}
+  .feat p b{color:var(--ink); font-weight:600}
+  .feat ul{list-style:none; margin-top:28px}
+  .feat li{display:flex; gap:14px; align-items:flex-start; padding:14px 0; font-size:15px; border-top:1px solid var(--line); color:var(--ink-2)}
+  .feat li .ic{width:18px;height:18px;color:var(--ink);margin-top:3px;flex-shrink:0; stroke-width:1.6}
+
+  .feat-card{
+    background:var(--paper);
+    border:1px solid var(--line-2); border-radius:22px; padding:38px;
+    box-shadow: 0 4px 20px -8px rgba(10,11,13,.06);
+  }
+  .feat-card .fc-h{font-size:12px; color:var(--steel); font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.14em; margin-bottom:28px}
+  .fc-bar{display:flex; align-items:flex-end; gap:20px; height:180px; margin-bottom:14px}
+  .fc-col{flex:1; display:flex; flex-direction:column; align-items:center; gap:12px; height:100%; justify-content:flex-end}
+  .fc-fill{width:100%; border-radius:6px 6px 0 0; position:relative}
+  .fc-fill.a{background:var(--paper-3); height:34%; border:1px solid var(--line)}
+  .fc-fill.b{background:var(--chrome); height:100%; box-shadow:0 0 0 .5px rgba(10,11,13,.2), inset 0 1px 0 rgba(255,255,255,.5)}
+  .fc-cap{font-size:12px; color:var(--steel); text-align:center; line-height:1.4; font-weight:500}
+  .fc-pct{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:16px; color:var(--ink)}
+  .fc-pct.muted{color:var(--steel)}
+  .fc-big{text-align:center; padding:22px 0 6px}
+  .fc-bignum{font-family:'Instrument Serif',serif; font-weight:400; font-size:clamp(48px,7vw,72px); letter-spacing:-.02em; color:var(--ink); line-height:1}
+  .fc-bignum small{font-family:'Manrope',sans-serif; font-size:22px; color:var(--steel); font-weight:500; margin-left:6px}
+  .fc-biglbl{font-size:14px; color:var(--ink-2); margin-top:10px}
+
+  @media(max-width:900px){.feat-in{grid-template-columns:1fr; gap:44px}}
+
+  /* === STEPS === */
+  .step-list{border-top:1px solid var(--line-2); counter-reset:s}
+  .step{
+    display:grid; grid-template-columns:100px 1fr auto; gap:32px;
+    padding:36px 0; border-bottom:1px solid var(--line);
+    align-items:start; counter-increment:s; transition:background .15s;
+  }
+  .step:hover{background:rgba(10,11,13,.02)}
+  .step .num{
+    font-family:'Instrument Serif',serif; font-weight:400; font-style:italic;
+    font-size:56px; color:var(--ink); letter-spacing:-.03em; line-height:.9;
+  }
+  .step .num::before{content:counter(s,decimal-leading-zero)}
+  .step h3{font-family:'Instrument Serif',serif; font-weight:400; font-size:30px; letter-spacing:-.01em; margin-bottom:10px; line-height:1.1}
+  .step p{color:var(--ink-2); font-size:16px; line-height:1.55; max-width:640px}
+  .step .tag{
+    font-family:'JetBrains Mono',monospace; font-size:11px;
+    color:var(--steel); background:transparent;
+    padding:6px 12px; border-radius:100px; font-weight:500;
+    border:1px solid var(--line-2); letter-spacing:.06em; text-transform:uppercase;
+    white-space:nowrap; align-self:start; margin-top:8px;
+  }
+  @media(max-width:720px){
+    .step{grid-template-columns:1fr; gap:12px}
+    .step .num{font-size:44px; margin-bottom:0}
+    .step .tag{margin-top:4px; justify-self:start}
+  }
+
+  /* === OFFER TABLE === */
+  .offer{
+    border:1px solid var(--line-2); border-radius:22px; overflow:hidden;
+    background:var(--paper);
+  }
+  .offer-row{display:grid; grid-template-columns:.9fr 1.1fr; border-bottom:1px solid var(--line)}
+  .offer-row:last-child{border-bottom:none}
+  .offer-row:nth-child(even){background:var(--paper-2)}
+  .offer-cell{padding:22px 32px}
+  .offer-cell:first-child{
+    border-right:1px solid var(--line); color:var(--ink); font-size:14px;
+    font-family:'JetBrains Mono',monospace; text-transform:uppercase;
+    letter-spacing:.08em; display:flex; align-items:center; gap:14px; font-weight:500;
+  }
+  .offer-cell:first-child .ic{width:18px;height:18px;color:var(--ink); stroke-width:1.4}
+  .offer-cell:last-child{font-weight:500; font-size:16px; display:flex; align-items:center; color:var(--ink-2)}
+  .offer-cell .free{color:var(--ok); font-weight:700}
+  .offer-cell .strong{color:var(--ink); font-weight:600}
+  @media(max-width:640px){
+    .offer-row{grid-template-columns:1fr}
+    .offer-cell{padding:18px 22px}
+    .offer-cell:first-child{border-right:none; border-bottom:1px solid var(--line); font-size:12px}
+  }
+
+  /* === FINAL: тёмный контрастный финал === */
+  .final{
+    position:relative; overflow:hidden; text-align:center; padding:120px 0 130px;
+    background: var(--ink); color:var(--paper);
+  }
+  .final::before{
+    content:""; position:absolute; top:0; left:20%; right:20%; height:1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent);
+  }
+  .final .rod-h{margin:0 auto 28px; display:block}
+  .final h2{font-size:clamp(44px,7vw,84px); margin-bottom:24px; position:relative; color:var(--paper); max-width:820px; margin-left:auto; margin-right:auto}
+  .final h2 em{font-style:italic; color:var(--steel-lo)}
+  .final p{color:var(--steel-lo); font-size:19px; max-width:560px; margin:0 auto 44px; position:relative; line-height:1.5}
+  .final-form{display:flex; gap:12px; max-width:600px; margin:0 auto; position:relative; flex-wrap:wrap; justify-content:center}
+  .final-form input{
+    flex:1; min-width:230px; background:transparent;
+    border:1px solid var(--line-dark-2); color:var(--paper);
+    padding:18px 24px; border-radius:100px; font-size:16px;
+    font-family:'Manrope',sans-serif; outline:none; transition:all .2s;
+  }
+  .final-form input:focus{border-color:var(--paper); background:rgba(255,255,255,.05)}
+  .final-form input::placeholder{color:var(--steel)}
+  .final-form .btn-chrome{padding:18px 32px}
+  .final-note{font-size:13px; color:var(--steel); margin-top:24px; position:relative; font-family:'JetBrains Mono',monospace; letter-spacing:.04em}
+  .form-ok{color:#7ee0a1; font-weight:600; margin-top:24px; position:relative; display:none; font-size:16px; align-items:center; justify-content:center; gap:10px}
+  .form-ok .ic{width:18px;height:18px}
+
+  /* === FOOTER === */
+  footer{border-top:1px solid var(--line); padding:44px 0 60px; color:var(--steel); font-size:14px; background:var(--paper)}
+  .foot-in{display:grid; grid-template-columns:auto 1fr auto; gap:24px; align-items:center}
+  .foot-in .logo{font-size:22px}
+  .foot-mid{text-align:center; font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:.06em; text-transform:uppercase}
+  .foot-in a{color:var(--ink)} .foot-in a:hover{opacity:.6}
+  @media(max-width:720px){.foot-in{grid-template-columns:1fr; text-align:left; gap:14px} .foot-mid{text-align:left}}
+
+  /* === REVEAL === */
+  .reveal{opacity:0; transform:translateY(20px); transition:opacity .8s cubic-bezier(.16,1,.3,1), transform .8s cubic-bezier(.16,1,.3,1)}
+  .reveal.in{opacity:1; transform:none}
+  @media(prefers-reduced-motion:reduce){
+    .reveal{opacity:1; transform:none; transition:none}
+    html{scroll-behavior:auto}
+    .hcard-bar i{animation:none}
+    .hcard-live::before{animation:none}
+  }
+</style>
+</head>
+<body>
+
+<nav aria-label="Основная навигация">
+  <div class="wrap nav-in">
+    <a href="#top" class="logo">rebar<span class="dot" aria-hidden="true"></span></a>
+    <div class="nav-links">
+      <a href="#calc">Экономика</a>
+      <a href="#why">Почему мы</a>
+      <a href="#credit">Кредитование</a>
+      <a href="#steps">Как открыть</a>
+    </div>
+    <a href="#final" class="nav-cta">Заказать звонок</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap hero-in">
+    <div>
+      <div class="hero-eyebrow reveal">
+        <span class="rod-h" aria-hidden="true"></span>
+        <span class="eyebrow">Франшиза сети · Иркутск · Улан-Удэ</span>
+      </div>
+      <h1 class="serif hero-h reveal">
+        <span class="rod" aria-hidden="true"></span>
+        Магазин техники,<br>
+        который <em>окупается,</em><br>
+        а не <em>пугает.</em>
+      </h1>
+      <p class="hero-sub reveal">
+        rebar — франшиза электроники с прозрачной экономикой и <b>вторым потоком дохода на кредитовании.</b> 0% роялти через наш канал закупки. Только оригинальная техника.
+      </p>
+      <div class="hero-cta reveal">
+        <a href="#final" class="btn btn-primary">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>
+          Заказать звонок
+        </a>
+        <a href="#calc" class="btn btn-ghost">Посчитать окупаемость</a>
+      </div>
+      <div class="hero-marks reveal">
+        <div class="hero-mark">
+          <div class="n">от 4<small>&nbsp;мес</small></div>
+          <div class="l">срок окупаемости</div>
+        </div>
+        <div class="hero-mark">
+          <div class="n">0<small>%</small></div>
+          <div class="l">роялти через наш канал</div>
+        </div>
+        <div class="hero-mark">
+          <div class="n">до 4<small>%</small></div>
+          <div class="l">доход с продаж в кредит</div>
+        </div>
+        <div class="hero-mark">
+          <div class="n">2021</div>
+          <div class="l">сеть работает с</div>
+        </div>
+      </div>
+    </div>
+    <div class="reveal">
+      <div class="hcard">
+        <div class="hcard-top">
+          <div class="hcard-tag">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9l1-5h14l1 5"/><path d="M4 9v11h16V9"/><path d="M4 9a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/></svg>
+            Флагман · Улан-Удэ
+          </div>
+          <div class="hcard-live">точка сети</div>
+        </div>
+        <div class="hcard-lbl">Выручка в месяц</div>
+        <div class="hcard-rev">4,8<small> млн ₽</small></div>
+        <div class="hcard-bar" aria-hidden="true"><i></i></div>
+        <div class="hcard-row">
+          <span class="k">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6 3 3 7-7"/><path d="M17 7h4v4"/></svg>
+            Чистая прибыль
+          </span>
+          <span class="v">≈ 640 000 ₽</span>
+        </div>
+        <div class="hcard-row">
+          <span class="k">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h3"/></svg>
+            Доход с кредитования
+          </span>
+          <span class="v">≈ 90 000 ₽</span>
+        </div>
+        <div class="hcard-row free">
+          <span class="k">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+            Роялти сети
+          </span>
+          <span class="v">0 ₽</span>
+        </div>
+        <p class="hcard-note">Пример действующей точки сети. Модель под ваш город собираем на созвоне.</p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- PROBLEMS -->
+<section class="strip">
+  <div class="wrap sec">
+    <div class="sec-head">
+      <div class="sec-label reveal">
+        <span class="rod-h" aria-hidden="true"></span>
+        <span class="eyebrow">В чём боль рынка</span>
+      </div>
+      <h2 class="sec-h serif reveal">Открыть магазин техники сегодня — <em>страшно и дорого.</em> Мы это меняем.</h2>
+    </div>
+    <div class="prob-grid">
+      <div class="prob reveal">
+        <div class="num">01</div>
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M10 9l4 4M14 9l-4 4"/></svg>
+        <h3>Страх проверок</h3>
+        <p>Серые схемы и «переклейка» истории устройств. Предприниматель работает с оглядкой, а не на результат.</p>
+      </div>
+      <div class="prob reveal">
+        <div class="num">02</div>
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h13M3 6v10a2 2 0 0 0 2 2h9"/><path d="M17 8h2a2 2 0 0 1 2 2v6"/><circle cx="10" cy="12" r="2"/><path d="M3 3l18 18"/></svg>
+        <h3>Роялти съедают прибыль</h3>
+        <p>Большинство франшиз берут паушальный взнос и 3–7% с оборота ежемесячно. Партнёр платит за бренд, а не зарабатывает.</p>
+      </div>
+      <div class="prob reveal">
+        <div class="num">03</div>
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" stroke-opacity=".4"/><path d="M4 7.5L12 12l8-4.5M12 12v9"/><path d="M3 3l18 18"/></svg>
+        <h3>Один поток дохода</h3>
+        <p>Заработок только с наценки. Просел трафик — просела выручка. Нет второй опоры, которая держит точку на плаву.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CALCULATOR -->
+<section id="calc">
+  <div class="wrap sec">
+    <div class="sec-head">
+      <div class="sec-label reveal">
+        <span class="rod-h" aria-hidden="true"></span>
+        <span class="eyebrow">Считаем на входе</span>
+      </div>
+      <h2 class="sec-h serif reveal">Ваша окупаемость — <em>не обещание,</em> а расчёт.</h2>
+      <p class="sec-lead reveal">Выберите формат и подвиньте параметры под свой город. Цифры пересчитываются вживую — по экономике действующих точек сети, с учётом дохода на кредитовании.</p>
+    </div>
+
+    <div class="calc-wrap reveal">
+      <div class="calc-controls">
+        <div class="cc-h">Параметры модели</div>
+        <label>Формат точки</label>
+        <div class="seg" id="fmt" role="tablist">
+          <button data-inv="1300000" data-rev="1100000" data-of="80000" data-or="0.08" data-mx="30" type="button">Пункт выдачи</button>
+          <button data-inv="3000000" data-rev="2500000" data-of="220000" data-or="0.11" data-mx="40" class="on" type="button">Стандарт</button>
+          <button data-inv="7500000" data-rev="5000000" data-of="420000" data-or="0.12" data-mx="45" type="button">Флагман</button>
+        </div>
+
+        <label>Инвестиции на старте <span class="calc-val" id="invV">3 000 000 ₽</span></label>
+        <input type="range" id="inv" min="800000" max="9000000" step="100000" value="3000000" aria-label="Инвестиции">
+
+        <label>Выручка в месяц <span class="calc-val" id="revV">2 500 000 ₽</span></label>
+        <input type="range" id="rev" min="500000" max="6000000" step="100000" value="2500000" aria-label="Выручка">
+
+        <label>Доля линии Re:Set в продажах <span class="calc-val" id="mixV">40%</span></label>
+        <input type="range" id="mix" min="0" max="100" step="5" value="40" aria-label="Доля Re:Set">
+      </div>
+
+      <div class="calc-out">
+        <div class="cap">Окупаемость</div>
+        <div class="calc-big"><span id="payback">9</span><small>мес</small></div>
+        <div class="calc-sub" id="profitLine">Чистая прибыль ≈ 320 000 ₽/мес</div>
+        <div class="calc-rows">
+          <div class="calc-row"><span>Средняя маржа</span><span id="marginR">22%</span></div>
+          <div class="calc-row"><span>Валовая прибыль/мес</span><span id="grossR">545 000 ₽</span></div>
+          <div class="calc-row"><span>Доход с кредитования (Lendo)</span><span id="creditR">50 000 ₽</span></div>
+          <div class="calc-row free"><span>Роялти сети</span><span>0 ₽</span></div>
+        </div>
+        <p class="calc-note">Расчёт ориентировочный, по усреднённым показателям сети. Точную модель под ваш город и локацию финансист rebar собирает на созвоне.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY -->
+<section id="why" class="strip">
+  <div class="wrap sec">
+    <div class="sec-head">
+      <div class="sec-label reveal">
+        <span class="rod-h" aria-hidden="true"></span>
+        <span class="eyebrow">Почему rebar</span>
+      </div>
+      <h2 class="sec-h serif reveal">Четыре причины, по которым <em>к нам заходят и остаются.</em></h2>
+    </div>
+    <div class="pill-grid">
+      <div class="pill reveal">
+        <div class="idx">01 — деньги</div>
+        <h3>Роялти 0% через наш канал</h3>
+        <p>Работаете с рекомендованными поставщиками — платите только сервисный сбор, а не процент с оборота. Хотите закупать сами — фиксированные 3–5%. Выбор всегда за вами.</p>
+      </div>
+      <div class="pill reveal">
+        <div class="idx">02 — доход</div>
+        <h3>Второй поток на кредитовании</h3>
+        <p>Каждую точку подключаем к Lendo — мультибанковской системе кредитования. Магазин зарабатывает на каждой продаже в кредит, даже когда клиент ещё думает над покупкой.</p>
+      </div>
+      <div class="pill reveal">
+        <div class="idx">03 — репутация</div>
+        <h3>Только оригинальная техника</h3>
+        <p>Никаких восстановленных и переклеенных устройств. Линия Re:Set — оригинал, бывший в использовании, из Кореи, без истории на рынке РФ, с годовой гарантией rebar.</p>
+      </div>
+      <div class="pill reveal">
+        <div class="idx">04 — запуск</div>
+        <h3>Открытие под ключ</h3>
+        <p>Товарная матрица, кредитование, CRM, обучение и аттестация персонала, стандарты выкладки, Avito. Первую выручку делаете в день открытия.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RE:SET -->
+<section id="reset" class="feat">
+  <div class="wrap sec">
+    <div class="feat-in">
+      <div class="reveal">
+        <div class="feat-badge">Re:Set</div>
+        <div class="h-rod">
+          <span class="rod" aria-hidden="true" style="height:1.4em; margin-top:.1em"></span>
+          <h2 class="serif">Оригинальная техника,<br><em>дешевле нового.</em></h2>
+        </div>
+        <p style="margin-top:24px">Re:Set — это <b>оригинальные</b> устройства Apple и Samsung из Кореи, уже бывшие в использовании, но без истории на российском рынке. Не восстановленные и не переклеенные — чистый оригинал с годовой гарантией rebar.</p>
+        <p>Для покупателя — тот же iPhone на 20–30% дешевле нового. Для вас — маржа выше, чем на новой технике, при меньших вложениях в склад.</p>
+        <ul>
+          <li>
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>
+            <span>Диагностика каждого устройства через 3uTools перед продажей</span>
+          </li>
+          <li>
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>
+            <span>Годовая гарантия — доверие покупателя и повторные продажи</span>
+          </li>
+          <li>
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>
+            <span>Новая техника, Re:Set и Trade-In — в одном зале</span>
+          </li>
+        </ul>
+      </div>
+      <div class="feat-card reveal">
+        <div class="fc-h">Маржинальность направления</div>
+        <div class="fc-bar">
+          <div class="fc-col">
+            <div class="fc-pct muted">~12%</div>
+            <div class="fc-fill a"></div>
+            <div class="fc-cap">Новая<br>техника</div>
+          </div>
+          <div class="fc-col">
+            <div class="fc-pct">до 35%</div>
+            <div class="fc-fill b"></div>
+            <div class="fc-cap">Линия<br>Re:Set</div>
+          </div>
+        </div>
+        <p class="calc-note" style="margin-top:20px; color:var(--steel); padding-top:14px; border-top:1px solid var(--line)">Re:Set ускоряет окупаемость точки примерно на треть при том же чеке аренды и зарплатах.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LENDO -->
+<section id="credit" class="feat" style="border-top:none">
+  <div class="wrap sec">
+    <div class="feat-in">
+      <div class="feat-card reveal" style="order:2">
+        <div class="fc-h">Доход с кредитования · флагман, Улан-Удэ</div>
+        <div class="fc-big">
+          <div class="fc-bignum">60—100<small>тыс ₽</small></div>
+          <div class="fc-biglbl">в месяц — перекрывает бóльшую часть аренды</div>
+        </div>
+        <div class="hcard-row" style="margin-top:22px; padding:14px 0">
+          <span class="k">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M8 7h6a2.5 2.5 0 0 1 0 5H8h8a2.5 2.5 0 0 1 0 5H8"/></svg>
+            Вознаграждение
+          </span>
+          <span class="v">до 4% с продаж в кредит</span>
+        </div>
+        <div class="hcard-row" style="padding:14px 0">
+          <span class="k">
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4"/></svg>
+            Банков-партнёров
+          </span>
+          <span class="v">мультибанк Lendo</span>
+        </div>
+      </div>
+      <div class="reveal">
+        <div class="feat-badge">Lendo · мультибанк</div>
+        <div class="h-rod">
+          <span class="rod" aria-hidden="true" style="height:1.4em; margin-top:.1em"></span>
+          <h2 class="serif">Пока техника продаётся,<br><em>магазин зарабатывает</em> на кредитах.</h2>
+        </div>
+        <p style="margin-top:24px">Мы подключаем каждую точку к <b>LendoInvest</b> — собственной мультибанковской системе кредитования товарного бизнеса. Под каждую локацию подбираем лучшие условия среди банков-партнёров — индивидуально под вашего клиента.</p>
+        <p>Система вознаграждения даёт <b>до 4% с каждой продажи в кредит.</b> В нашем флагмане в Улан-Удэ это 60–100 тыс. ₽ в месяц — этого хватает, чтобы закрыть бóльшую часть аренды ещё до наценки на товар.</p>
+        <ul>
+          <li>
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>
+            <span>Подключение к кредитованию — обязательная часть запуска</span>
+          </li>
+          <li>
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>
+            <span>Внутренняя и внешняя CRM — настраиваем под точку</span>
+          </li>
+          <li>
+            <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>
+            <span>Индивидуальные банковские условия под каждую локацию</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STEPS -->
+<section id="steps" class="strip">
+  <div class="wrap sec">
+    <div class="sec-head">
+      <div class="sec-label reveal">
+        <span class="rod-h" aria-hidden="true"></span>
+        <span class="eyebrow">Как открыть</span>
+      </div>
+      <h2 class="sec-h serif reveal">Пять шагов от заявки <em>до первой выручки.</em></h2>
+    </div>
+    <div class="step-list">
+      <div class="step reveal">
+        <div class="num"></div>
+        <div>
+          <h3>Заявка и созвон</h3>
+          <p>Оставляете номер — финансист rebar собирает модель под ваш город, показывает реальную экономику с доходом на кредитовании и отвечает на вопросы. Без воды и давления.</p>
+        </div>
+        <span class="tag">1–2 дня</span>
+      </div>
+      <div class="step reveal">
+        <div class="num"></div>
+        <div>
+          <h3>Договор и документы</h3>
+          <p>Подписываем пакет, проверенный юристами по франчайзингу: лицензия на ноу-хау, соглашение о содействии в закупке, договор оказания услуг. Всё прозрачно.</p>
+        </div>
+        <span class="tag">3–5 дней</span>
+      </div>
+      <div class="step reveal">
+        <div class="num"></div>
+        <div>
+          <h3>Помещение и матрица</h3>
+          <p>Помогаем выбрать локацию, рассчитываем стартовый товарный запас под ваш формат и подключаем к каналу закупки оригинальной техники.</p>
+        </div>
+        <span class="tag">до 3 недель</span>
+      </div>
+      <div class="step reveal">
+        <div class="num"></div>
+        <div>
+          <h3>Кредитование, CRM и обучение</h3>
+          <p>Подключаем точку к Lendo и настраиваем банковские условия под локацию, разворачиваем внутреннюю и внешнюю CRM, обучаем персонал по методичке и скриптам, настраиваем выкладку, Avito и кассу.</p>
+        </div>
+        <span class="tag">1–2 недели</span>
+      </div>
+      <div class="step reveal">
+        <div class="num"></div>
+        <div>
+          <h3>Открытие и сопровождение</h3>
+          <p>Наш представитель рядом в первые дни. Дальше — постоянная поддержка: обновление матрицы, банковских условий, скриптов и маркетинговых материалов.</p>
+        </div>
+        <span class="tag">и дальше с вами</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- OFFER TABLE -->
+<section>
+  <div class="wrap sec">
+    <div class="sec-head">
+      <div class="sec-label reveal">
+        <span class="rod-h" aria-hidden="true"></span>
+        <span class="eyebrow">Условия коротко</span>
+      </div>
+      <h2 class="sec-h serif reveal">Честно, <em>без звёздочек мелким шрифтом.</em></h2>
+    </div>
+    <div class="offer reveal">
+      <div class="offer-row">
+        <div class="offer-cell">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9v6M18 9v6"/></svg>
+          Инвестиции
+        </div>
+        <div class="offer-cell">Пункт выдачи <span class="strong">1—1,5 млн</span> · Стандарт <span class="strong">2—3,5 млн</span> · Флагман <span class="strong">7—8 млн ₽</span></div>
+      </div>
+      <div class="offer-row">
+        <div class="offer-cell">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5L5 19"/><circle cx="7.5" cy="7.5" r="2"/><circle cx="16.5" cy="16.5" r="2"/></svg>
+          Роялти
+        </div>
+        <div class="offer-cell"><span class="free">0% через наш канал</span>&nbsp;· 3–5% при самостоятельной закупке</div>
+      </div>
+      <div class="offer-row">
+        <div class="offer-cell">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h3"/></svg>
+          Второй поток
+        </div>
+        <div class="offer-cell">Содействие в кредитовании (Lendo) · <span class="strong">до 4% с продаж в кредит</span></div>
+      </div>
+      <div class="offer-row">
+        <div class="offer-cell">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v6M6 14v6M12 4v10M18 4v2M18 10v10"/><circle cx="6" cy="12" r="2"/><circle cx="12" cy="16" r="2"/><circle cx="18" cy="8" r="2"/></svg>
+          Что подключаем
+        </div>
+        <div class="offer-cell">Кредитование · CRM внутренняя и внешняя · товарная матрица</div>
+      </div>
+      <div class="offer-row">
+        <div class="offer-cell">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          Срок запуска
+        </div>
+        <div class="offer-cell"><span class="strong">4—6 недель</span> под ключ</div>
+      </div>
+      <div class="offer-row">
+        <div class="offer-cell">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg>
+          Ассортимент
+        </div>
+        <div class="offer-cell">Новая техника · линия Re:Set · Trade-In · аксессуары</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL -->
+<section id="final" class="final">
+  <div class="wrap">
+    <span class="rod-h reveal" aria-hidden="true"></span>
+    <h2 class="serif reveal">Посчитаем вашу точку <em>вместе.</em></h2>
+    <p class="reveal">Оставьте номер — перезвоним, соберём модель под ваш город с учётом кредитного дохода и покажем, за сколько окупится именно ваш магазин.</p>
+    <form class="final-form reveal" id="leadForm" novalidate>
+      <input type="text" id="leadName" placeholder="Как вас зовут" aria-label="Имя">
+      <input type="tel" id="leadPhone" placeholder="+7 (___) ___-__-__" aria-label="Телефон">
+      <button type="submit" class="btn btn-chrome">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>
+        Заказать звонок
+      </button>
+    </form>
+    <div class="final-note reveal">→ Обработка данных — по согласию</div>
+    <div class="form-ok" id="formOk">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>
+      Заявка принята. Перезвоним в течение рабочего дня.
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-in">
+    <a href="#top" class="logo">rebar<span class="dot" aria-hidden="true"></span></a>
+    <div class="foot-mid">ИП Цыпылов Дамдин · Иркутск · Улан-Удэ · <a href="https://t.me/damdiin">@damdiin</a></div>
+    <div>rebar.ru · © 2026</div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var inv=document.getElementById('inv'), rev=document.getElementById('rev'), mix=document.getElementById('mix');
+  var invV=document.getElementById('invV'), revV=document.getElementById('revV'), mixV=document.getElementById('mixV');
+  var payback=document.getElementById('payback'), profitLine=document.getElementById('profitLine');
+  var marginR=document.getElementById('marginR'), grossR=document.getElementById('grossR'), creditR=document.getElementById('creditR');
+  var fmt=document.getElementById('fmt');
+  var opexFloor=220000, opexRate=0.11;
+
+  function rub(n){ return Math.round(n).toLocaleString('ru-RU')+' ₽'; }
+
+  function calc(){
+    var I=+inv.value, R=+rev.value, M=+mix.value/100;
+    var margin=0.13+(0.35-0.13)*M;
+    var gross=R*margin;
+    var credit=R*0.02;
+    var opex=Math.max(opexFloor, R*opexRate);
+    var profit=gross+credit-opex;
+    invV.textContent=rub(I);
+    revV.textContent=rub(R);
+    mixV.textContent=Math.round(M*100)+'%';
+    marginR.textContent=Math.round(margin*100)+'%';
+    grossR.textContent=rub(gross);
+    creditR.textContent='≈ '+rub(credit);
+    if(profit<=0){
+      payback.textContent='—';
+      profitLine.textContent='Поднимите выручку или долю Re:Set';
+    } else {
+      payback.textContent=Math.max(1,Math.round(I/profit));
+      profitLine.textContent='Чистая прибыль ≈ '+rub(profit)+'/мес';
+    }
+  }
+  [inv,rev,mix].forEach(function(el){ el.addEventListener('input',calc); });
+
+  fmt.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click',function(){
+      fmt.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});
+      b.classList.add('on');
+      inv.value=b.dataset.inv; rev.value=b.dataset.rev; mix.value=b.dataset.mx;
+      opexFloor=+b.dataset.of; opexRate=+b.dataset.or;
+      calc();
+    });
+  });
+  calc();
+
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
+  },{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(function(el,i){
+    el.style.transitionDelay=(Math.min(i%5,4)*70)+'ms'; io.observe(el);
+  });
+
+  var form=document.getElementById('leadForm');
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    var name=document.getElementById('leadName'), phone=document.getElementById('leadPhone');
+    var okName=name.value.trim().length>1;
+    var digits=(phone.value.match(/\d/g)||[]).length;
+    name.style.borderColor=okName?'':'#e24b4a';
+    phone.style.borderColor=digits>=10?'':'#e24b4a';
+    if(okName && digits>=10){ form.style.display='none'; document.getElementById('formOk').style.display='flex'; }
+  });
+  ['leadName','leadPhone'].forEach(function(id){
+    document.getElementById(id).addEventListener('input',function(){ this.style.borderColor=''; });
+  });
+})();
+</script>
+</body>
+</html>
