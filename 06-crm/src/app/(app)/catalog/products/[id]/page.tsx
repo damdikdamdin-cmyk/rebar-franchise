@@ -3,10 +3,13 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { canAccessRetail, canEditCatalog } from "@/lib/access";
-import { upsertProduct } from "@/actions/retail";
+import { upsertProduct, softDeleteProduct } from "@/actions/retail";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/fields";
 import { PrintActions } from "@/components/print/print-actions";
+import { SerialTrackedFields } from "@/components/serial-tracked-fields";
+import { dateTime } from "@/lib/format";
+import { DeletedMark } from "@/components/deleted-mark";
 
 export default async function ProductEditPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -17,11 +20,18 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
   if (isNew && !canEdit) redirect("/catalog/products");
   const product = isNew
     ? null
-    : await prisma.product.findUnique({ where: { id }, include: { balances: { include: { store: true } } } });
+    : await prisma.product.findUnique({
+        where: { id },
+        include: {
+          balances: { include: { store: true } },
+          serials: { include: { store: true }, orderBy: { createdAt: "desc" }, take: 40 },
+        },
+      });
   if (!isNew && !product) notFound();
 
   const groups = await prisma.productGroup.findMany({ orderBy: { name: "asc" } });
   const suppliers = await prisma.supplier.findMany({ orderBy: { name: "asc" } });
+  const stores = await prisma.store.findMany({ orderBy: { city: "asc" }, select: { id: true, city: true } });
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -30,6 +40,12 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
           ← Товары
         </Link>
         <h1 className="mt-2 font-serif text-4xl">{isNew ? "Новый товар" : product!.name}</h1>
+        {!isNew && product?.deletedAt ? (
+          <div className="mt-2">
+            <DeletedMark at={product.deletedAt} />
+            <p className="mt-1 text-sm text-red-600">Номенклатура удалена — скрыта с остатков, история сохранена.</p>
+          </div>
+        ) : null}
         {!isNew && product ? (
           <div className="mt-3">
             <PrintActions
@@ -136,16 +152,42 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
             <Input id="commissionRub" name="commissionRub" type="number" defaultValue={product?.commissionRub ?? 0} />
           </div>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="serialTracked" defaultChecked={product?.serialTracked ?? false} />
-          Серийный товар (IMEI / S/N)
-        </label>
+        <SerialTrackedFields
+          defaultChecked={product?.serialTracked ?? false}
+          stores={stores}
+          existingSerials={(product?.serials ?? []).map((s) => ({
+            serial: s.serial,
+            status: s.status,
+            storeCity: s.store.city,
+          }))}
+        />
         <div>
           <Label htmlFor="description">Описание</Label>
           <Textarea id="description" name="description" defaultValue={product?.description ?? ""} />
         </div>
         <Button type="submit">Сохранить</Button>
       </form>
+
+      {!isNew && product && canEdit && !product.deletedAt ? (
+        <section className="border border-red-200 bg-card p-4">
+          <h2 className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-red-600">
+            Удалить номенклатуру
+          </h2>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Товар не уничтожается: помечается удалённым (красный ×), скрывается с остатков и из кассы, остаётся в
+            истории.
+          </p>
+          <form action={softDeleteProduct}>
+            <input type="hidden" name="productId" value={product.id} />
+            <button
+              type="submit"
+              className="h-9 border border-red-600 bg-red-600 px-4 font-mono text-[10px] uppercase text-white"
+            >
+              Удалить ×
+            </button>
+          </form>
+        </section>
+      ) : null}
 
       {product?.balances?.length ? (
         <section>
@@ -160,6 +202,68 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
           </ul>
         </section>
       ) : null}
+
+      {!isNew && product ? <ProductHistory productId={product.id} serials={product.serials} /> : null}
     </div>
+  );
+}
+
+async function ProductHistory({
+  productId,
+  serials,
+}: {
+  productId: string;
+  serials: Array<{ id: string; serial: string; store: { city: string; id: string }; status: string }>;
+}) {
+  const history = await prisma.changeLog.findMany({
+    where: {
+      OR: [{ productId }, { serialId: { in: serials.map((s) => s.id) } }],
+    },
+    include: { user: true },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
+
+  return (
+    <>
+      {serials.length ? (
+        <section>
+          <h2 className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+            Устройства (S/N)
+          </h2>
+          <ul className="divide-y divide-border border border-border bg-card">
+            {serials.map((s) => (
+              <li key={s.id} className="flex flex-wrap justify-between gap-2 px-4 py-2 text-sm">
+                <span className="font-mono">{s.serial}</span>
+                <span className="text-xs text-muted-foreground">
+                  {s.store.city} · {s.status}{" "}
+                  <Link href={`/stores/${s.store.id}/devices/${s.id}`} className="underline">
+                    история
+                  </Link>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      <section>
+        <h2 className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+          История номенклатуры
+        </h2>
+        <ul className="divide-y divide-border border border-border bg-card">
+          {!history.length ? (
+            <li className="px-4 py-3 text-sm text-muted-foreground">Записей пока нет</li>
+          ) : null}
+          {history.map((h) => (
+            <li key={h.id} className="px-4 py-3 text-sm">
+              <p>{h.summary}</p>
+              <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                {dateTime(h.createdAt)} · {h.user?.name ?? "система"} · {h.action}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
   );
 }

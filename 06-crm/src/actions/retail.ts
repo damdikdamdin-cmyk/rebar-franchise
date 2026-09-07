@@ -9,6 +9,7 @@ import { assertStoreAccess, canEditCatalog, isUk } from "@/lib/access";
 import { applyBalance, lineTotal, nextDocNumber, nextOrderNumber, nextSaleNumber, postStockDocument } from "@/lib/stock";
 import { ensureStoreCash, postCashTxn } from "@/lib/cash";
 import { nextProductBarcode } from "@/lib/barcode";
+import { writeChangeLog } from "@/lib/audit";
 
 async function loadStore(storeId: string) {
   const user = await requireUser();
@@ -66,13 +67,37 @@ export async function upsertProduct(formData: FormData) {
 
   if (!data.barcode) data.barcode = await nextProductBarcode(prisma, data.code);
 
+  const serialStoreId = String(formData.get("serialStoreId") ?? "").trim();
+  const newSerials = String(formData.get("newSerials") ?? "")
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  async function attachSerials(productId: string) {
+    if (!data.serialTracked || !serialStoreId || !newSerials.length) return;
+    const store = await prisma.store.findUnique({ where: { id: serialStoreId } });
+    if (!store) return;
+    for (const serial of newSerials) {
+      const existing = await prisma.productSerial.findUnique({
+        where: { productId_serial: { productId, serial } },
+      });
+      if (existing) continue;
+      await prisma.productSerial.create({
+        data: { productId, storeId: serialStoreId, serial, status: "in_stock" },
+      });
+      await applyBalance(prisma, serialStoreId, productId, 1);
+    }
+  }
+
   if (id) {
     await prisma.product.update({ where: { id }, data });
+    await attachSerials(id);
     revalidatePath("/catalog/products");
     revalidatePath(`/catalog/products/${id}`);
     redirect(`/catalog/products/${id}`);
   }
   const product = await prisma.product.create({ data });
+  await attachSerials(product.id);
   revalidatePath("/catalog/products");
   redirect(`/catalog/products/${product.id}`);
 }
@@ -120,6 +145,10 @@ export async function completeSale(formData: FormData) {
   const customerName = String(formData.get("customerName") ?? "").trim();
   const creditAmount = Number(formData.get("creditAmount") ?? 0);
   const note = String(formData.get("note") ?? "").trim() || null;
+  const printKeys = [
+    formData.get("printReceipt") ? "receipt" : null,
+    formData.get("printWarranty") ? "warranty" : null,
+  ].filter(Boolean) as string[];
 
   let customerId: string | null = null;
   if (phone) {
@@ -133,6 +162,7 @@ export async function completeSale(formData: FormData) {
 
   const computed = lines.map((line) => ({
     ...line,
+    serial: line.serial?.trim() || "",
     lineTotal: lineTotal(line.unitPrice, line.qty, line.discountType, line.discountValue),
   }));
   const amount = computed.reduce((s, l) => s + l.lineTotal, 0);
@@ -142,25 +172,103 @@ export async function completeSale(formData: FormData) {
   );
 
   const number = await nextSaleNumber();
-  const warrantyByProduct = new Map(
-    (
-      await prisma.product.findMany({
-        where: { id: { in: computed.map((l) => l.productId) } },
-        select: { id: true, warrantyDays: true },
-      })
-    ).map((p) => [p.id, p.warrantyDays]),
-  );
+  const products = await prisma.product.findMany({
+    where: { id: { in: computed.map((l) => l.productId) } },
+    select: { id: true, warrantyDays: true, serialTracked: true, purchasePrice: true },
+  });
+  const productMeta = new Map(products.map((p) => [p.id, p]));
+
   const sale = await prisma.$transaction(async (tx) => {
+    const saleLines: Array<{
+      productId: string;
+      name: string;
+      qty: number;
+      unitPrice: number;
+      costPrice: number;
+      discountType: DiscountType;
+      discountValue: number;
+      lineTotal: number;
+      serial: string | null;
+      warrantyDays: number | null;
+    }> = [];
+
     for (const line of computed) {
-      await applyBalance(tx, storeId, line.productId, -line.qty);
-      if (line.serial) {
-        await tx.productSerial.updateMany({
-          where: { productId: line.productId, serial: line.serial },
+      const meta = productMeta.get(line.productId);
+      let costPrice = meta?.purchasePrice ?? 0;
+      if (meta?.serialTracked) {
+        if (!line.serial) throw new Error("Для серийного товара нужен IMEI / S/N");
+        if (line.qty !== 1) throw new Error("Серийный товар продаётся по 1 шт. с IMEI / S/N");
+        const serialRow = await tx.productSerial.findFirst({
+          where: {
+            productId: line.productId,
+            storeId,
+            serial: line.serial,
+            status: "in_stock",
+          },
+        });
+        if (!serialRow) {
+          throw new Error(`IMEI / S/N не найден на складе: ${line.serial}`);
+        }
+        costPrice = serialRow.purchasePrice ?? costPrice;
+        await tx.productSerial.update({
+          where: { id: serialRow.id },
           data: { status: "sold" },
         });
+        saleLines.push({
+          productId: line.productId,
+          name: line.name,
+          qty: line.qty,
+          unitPrice: line.unitPrice,
+          costPrice,
+          discountType: line.discountType,
+          discountValue: line.discountValue,
+          lineTotal: line.lineTotal,
+          serial: line.serial || null,
+          warrantyDays: serialRow.warrantyDays ?? meta?.warrantyDays ?? null,
+        });
+        await applyBalance(tx, storeId, line.productId, -line.qty);
+        continue;
+      } else if (line.serial) {
+        const serialRow = await tx.productSerial.findFirst({
+          where: { productId: line.productId, storeId, serial: line.serial, status: "in_stock" },
+        });
+        if (serialRow) {
+          costPrice = serialRow.purchasePrice ?? costPrice;
+          await tx.productSerial.update({
+            where: { id: serialRow.id },
+            data: { status: "sold" },
+          });
+          saleLines.push({
+            productId: line.productId,
+            name: line.name,
+            qty: line.qty,
+            unitPrice: line.unitPrice,
+            costPrice,
+            discountType: line.discountType,
+            discountValue: line.discountValue,
+            lineTotal: line.lineTotal,
+            serial: line.serial || null,
+            warrantyDays: serialRow.warrantyDays ?? meta?.warrantyDays ?? null,
+          });
+          await applyBalance(tx, storeId, line.productId, -line.qty);
+          continue;
+        }
       }
+      await applyBalance(tx, storeId, line.productId, -line.qty);
+      saleLines.push({
+        productId: line.productId,
+        name: line.name,
+        qty: line.qty,
+        unitPrice: line.unitPrice,
+        costPrice,
+        discountType: line.discountType,
+        discountValue: line.discountValue,
+        lineTotal: line.lineTotal,
+        serial: line.serial || null,
+        warrantyDays: meta?.warrantyDays ?? null,
+      });
     }
-    return tx.sale.create({
+    const created = await tx.sale.create({
       data: {
         storeId,
         customerId,
@@ -170,21 +278,54 @@ export async function completeSale(formData: FormData) {
         discountTotal,
         note,
         number,
-        lines: {
-          create: computed.map((line) => ({
-            productId: line.productId,
-            name: line.name,
-            qty: line.qty,
-            unitPrice: line.unitPrice,
-            discountType: line.discountType,
-            discountValue: line.discountValue,
-            lineTotal: line.lineTotal,
-            serial: line.serial || null,
-            warrantyDays: warrantyByProduct.get(line.productId) ?? null,
-          })),
-        },
+        lines: { create: saleLines },
       },
+      include: { lines: true },
     });
+    for (const sl of created.lines) {
+      await writeChangeLog(
+        {
+          storeId,
+          userId: user.id,
+          entityType: "sale",
+          entityId: created.id,
+          action: "sell",
+          summary: `Продажа ${number}: ${sl.name}${sl.serial ? ` · IMEI ${sl.serial}` : ""} · ${sl.lineTotal} ₽ (закуп ${sl.costPrice})`,
+          productId: sl.productId,
+          serialNew: sl.serial,
+          saleId: created.id,
+          meta: {
+            unitPrice: sl.unitPrice,
+            costPrice: sl.costPrice,
+            warrantyDays: sl.warrantyDays,
+          },
+        },
+        tx,
+      );
+      if (sl.serial) {
+        const ser = await tx.productSerial.findFirst({
+          where: { productId: sl.productId ?? undefined, serial: sl.serial },
+        });
+        if (ser) {
+          await writeChangeLog(
+            {
+              storeId,
+              userId: user.id,
+              entityType: "serial",
+              entityId: ser.id,
+              action: "sell",
+              summary: `Выдан в продаже ${number}`,
+              productId: sl.productId,
+              serialId: ser.id,
+              serialNew: sl.serial,
+              saleId: created.id,
+            },
+            tx,
+          );
+        }
+      }
+    }
+    return created;
   });
 
   const cashIn = amount - Math.max(0, Math.round(creditAmount));
@@ -202,7 +343,8 @@ export async function completeSale(formData: FormData) {
   }
 
   revalidateStore(storeId);
-  redirect(`/stores/${storeId}/pos?sold=${sale.id}`);
+  const printQs = printKeys.length ? `&print=${printKeys.join(",")}` : "";
+  redirect(`/stores/${storeId}/pos?sold=${sale.id}${printQs}`);
 }
 
 export async function createStockDoc(formData: FormData) {
@@ -213,20 +355,49 @@ export async function createStockDoc(formData: FormData) {
   const toStoreId = String(formData.get("toStoreId") ?? "") || null;
   const supplierId = String(formData.get("supplierId") ?? "") || null;
   const payload = String(formData.get("payload") ?? "[]");
-  let lines: Array<{
-    productId: string;
+  let rawLines: Array<{
+    productId?: string | null;
+    name?: string;
+    code?: string;
     qty: number;
     price?: number;
+    retailPrice?: number;
+    warrantyDays?: number;
     serial?: string;
+    serialTracked?: boolean;
     qtyAccount?: number;
     qtyActual?: number;
   }> = [];
   try {
-    lines = JSON.parse(payload);
+    rawLines = JSON.parse(payload);
   } catch {
     return;
   }
-  if (!lines.length) return;
+  if (!rawLines.length) return;
+
+  const lines = await Promise.all(
+    rawLines.map(async (line) => {
+      const productId = await ensureProductForReceiptLine({
+        productId: line.productId,
+        name: line.name,
+        code: line.code,
+        purchasePrice: line.price ?? 0,
+        retailPrice: line.retailPrice ?? 0,
+        warrantyDays: line.warrantyDays,
+        serialTracked: Boolean(line.serialTracked || line.serial),
+      });
+      return {
+        productId,
+        qty: line.qty,
+        price: line.price ?? 0,
+        retailPrice: line.retailPrice ?? 0,
+        warrantyDays: line.warrantyDays,
+        serial: line.serial,
+        qtyAccount: line.qtyAccount,
+        qtyActual: line.qtyActual,
+      };
+    }),
+  );
 
   const prefixes: Record<StockDocType, string> = {
     receipt: "C",
@@ -236,6 +407,10 @@ export async function createStockDoc(formData: FormData) {
     inventory: "I",
     writeoff: "W",
   };
+
+  const externalNumber = String(formData.get("externalNumber") ?? "").trim() || null;
+  const externalDateRaw = String(formData.get("externalDate") ?? "").trim();
+  const externalDate = externalDateRaw ? new Date(`${externalDateRaw}T12:00:00`) : null;
 
   const totalAmount = lines.reduce((s, l) => s + (l.price ?? 0) * l.qty, 0);
   const doc = await prisma.stockDocument.create({
@@ -247,12 +422,16 @@ export async function createStockDoc(formData: FormData) {
       supplierId: supplierId === "__none__" ? null : supplierId,
       userId: user.id,
       comment,
+      externalNumber,
+      externalDate: externalDate && !Number.isNaN(externalDate.getTime()) ? externalDate : null,
       totalAmount,
       lines: {
         create: lines.map((line) => ({
           productId: line.productId,
           qty: line.qty,
           price: line.price ?? 0,
+          retailPrice: line.retailPrice ?? 0,
+          warrantyDays: line.warrantyDays ?? null,
           serial: line.serial || null,
           qtyAccount: line.qtyAccount ?? 0,
           qtyActual: line.qtyActual ?? line.qty,
@@ -263,7 +442,7 @@ export async function createStockDoc(formData: FormData) {
 
   const autoPost = formData.get("autoPost") === "on" || formData.get("autoPost") === "1";
   if (autoPost) {
-    await postStockDocument(doc.id);
+    await postStockDocument(doc.id, user.id);
     if (type === "receipt" && Number(formData.get("paidAmount") ?? 0) > 0) {
       const register = await ensureStoreCash(storeId);
       await postCashTxn({
@@ -295,6 +474,10 @@ export async function createStockDoc(formData: FormData) {
   }
 
   revalidateStore(storeId);
+  revalidatePath("/catalog/products");
+  if (type === "receipt") {
+    redirect(`/stores/${storeId}/receipts/${doc.id}`);
+  }
   const paths: Partial<Record<StockDocType, string>> = {
     receipt: "receipts",
     transfer: "transfers",
@@ -306,11 +489,102 @@ export async function createStockDoc(formData: FormData) {
   redirect(`/stores/${storeId}/${paths[type] ?? "stock"}`);
 }
 
+/** Находит товар по id/коду/названию или создаёт новую номенклатуру. */
+async function ensureProductForReceiptLine(input: {
+  productId?: string | null;
+  name?: string;
+  code?: string;
+  purchasePrice: number;
+  retailPrice: number;
+  warrantyDays?: number;
+  serialTracked: boolean;
+}) {
+  if (input.productId) {
+    if (input.productId.startsWith("tmp-")) {
+      // локальный черновик из UI — ищем/создаём по имени
+    } else {
+      const existing = await prisma.product.findUnique({ where: { id: input.productId } });
+      if (existing) {
+        await prisma.product.update({
+          where: { id: existing.id },
+          data: {
+            ...(input.purchasePrice > 0 ? { purchasePrice: input.purchasePrice } : {}),
+            ...(input.retailPrice > 0 ? { retailPrice: input.retailPrice } : {}),
+            ...(input.warrantyDays != null ? { warrantyDays: input.warrantyDays } : {}),
+            ...(input.serialTracked ? { serialTracked: true } : {}),
+          },
+        });
+        return existing.id;
+      }
+    }
+  }
+
+  const name = (input.name ?? "").trim();
+  const codeRaw = (input.code ?? "").trim();
+  if (!name && !codeRaw) throw new Error("Укажите название или код товара");
+
+  if (codeRaw && codeRaw !== "новый") {
+    const byCode = await prisma.product.findUnique({ where: { code: codeRaw } });
+    if (byCode) {
+      await prisma.product.update({
+        where: { id: byCode.id },
+        data: {
+          ...(name ? { name } : {}),
+          ...(input.purchasePrice > 0 ? { purchasePrice: input.purchasePrice } : {}),
+          ...(input.retailPrice > 0 ? { retailPrice: input.retailPrice } : {}),
+          ...(input.warrantyDays != null ? { warrantyDays: input.warrantyDays } : {}),
+          ...(input.serialTracked ? { serialTracked: true } : {}),
+          active: true,
+        },
+      });
+      return byCode.id;
+    }
+  }
+
+  if (name) {
+    const candidates = await prisma.product.findMany({
+      where: { active: true },
+      select: { id: true, name: true, purchasePrice: true, retailPrice: true },
+      take: 5000,
+    });
+    const byName = candidates.find((p) => p.name.toLowerCase() === name.toLowerCase());
+    if (byName) {
+      await prisma.product.update({
+        where: { id: byName.id },
+        data: {
+          ...(input.purchasePrice > 0 ? { purchasePrice: input.purchasePrice } : {}),
+          ...(input.retailPrice > 0 ? { retailPrice: input.retailPrice } : {}),
+          ...(input.warrantyDays != null ? { warrantyDays: input.warrantyDays } : {}),
+          ...(input.serialTracked ? { serialTracked: true } : {}),
+          active: true,
+        },
+      });
+      return byName.id;
+    }
+  }
+
+  const count = await prisma.product.count();
+  const code = codeRaw && codeRaw !== "новый" ? codeRaw : `N${String(count + 1).padStart(5, "0")}`;
+  const created = await prisma.product.create({
+    data: {
+      code,
+      name: name || code,
+      barcode: await nextProductBarcode(prisma, code),
+      purchasePrice: input.purchasePrice,
+      retailPrice: input.retailPrice,
+      warrantyDays: input.warrantyDays ?? 365,
+      serialTracked: input.serialTracked,
+      active: true,
+    },
+  });
+  return created.id;
+}
+
 export async function postExistingStockDoc(formData: FormData) {
   const storeId = String(formData.get("storeId") ?? "");
   const documentId = String(formData.get("documentId") ?? "");
-  await loadStore(storeId);
-  await postStockDocument(documentId);
+  const { user } = await loadStore(storeId);
+  await postStockDocument(documentId, user.id);
   revalidateStore(storeId);
 }
 
@@ -342,8 +616,13 @@ export async function createOrder(formData: FormData) {
   const customerName = String(formData.get("customerName") ?? "").trim();
   const comment = String(formData.get("comment") ?? "").trim() || null;
   const prepaidAmount = Number(formData.get("prepaidAmount") ?? 0);
+  const kindRaw = String(formData.get("kind") ?? "stock_reserve");
+  const kind = kindRaw === "procurement" ? "procurement" : "stock_reserve";
+  const dueRaw = String(formData.get("dueAt") ?? "").trim();
+  const dueAt = dueRaw ? new Date(`${dueRaw}T12:00:00`) : null;
+  const statusRaw = String(formData.get("status") ?? "");
   const payload = String(formData.get("payload") ?? "[]");
-  let lines: Array<{ productId: string; name: string; qty: number; unitPrice: number }> = [];
+  let lines: Array<{ productId: string | null; name: string; qty: number; unitPrice: number }> = [];
   try {
     lines = JSON.parse(payload);
   } catch {
@@ -361,13 +640,27 @@ export async function createOrder(formData: FormData) {
     customerId = customer.id;
   }
 
-  const mapped = lines.map((l) => ({ ...l, lineTotal: l.unitPrice * l.qty }));
+  const mapped = lines.map((l) => ({
+    ...l,
+    productId: l.productId || null,
+    lineTotal: l.unitPrice * l.qty,
+  }));
   const totalAmount = mapped.reduce((s, l) => s + l.lineTotal, 0);
 
+  const procurementStatus =
+    statusRaw === "in_transit" ||
+    statusRaw === "arrived" ||
+    statusRaw === "purchased" ||
+    statusRaw === "accepted"
+      ? statusRaw
+      : "accepted";
+
   const order = await prisma.$transaction(async (tx) => {
-    for (const line of mapped) {
-      if (!line.productId) continue;
-      await applyBalance(tx, storeId, line.productId, -line.qty);
+    if (kind === "stock_reserve") {
+      for (const line of mapped) {
+        if (!line.productId) throw new Error("Для резерва нужна позиция из каталога");
+        await applyBalance(tx, storeId, line.productId, -line.qty);
+      }
     }
     return tx.order.create({
       data: {
@@ -375,13 +668,15 @@ export async function createOrder(formData: FormData) {
         storeId,
         customerId,
         userId: user.id,
-        status: "reserved",
+        kind,
+        status: kind === "stock_reserve" ? "reserved" : procurementStatus,
         totalAmount,
         prepaidAmount: Math.max(0, prepaidAmount),
         comment,
+        dueAt: kind === "procurement" && dueAt && !Number.isNaN(dueAt.getTime()) ? dueAt : null,
         lines: {
           create: mapped.map((l) => ({
-            productId: l.productId,
+            productId: l.productId || null,
             name: l.name,
             qty: l.qty,
             unitPrice: l.unitPrice,
@@ -408,6 +703,24 @@ export async function createOrder(formData: FormData) {
   redirect(`/stores/${storeId}/orders`);
 }
 
+export async function updateOrderStatus(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const orderId = String(formData.get("orderId") ?? "");
+  const status = String(formData.get("status") ?? "");
+  await loadStore(storeId);
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order || order.storeId !== storeId || order.kind !== "procurement") return;
+  if (!["accepted", "purchased", "in_transit", "arrived"].includes(status)) return;
+  await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      status: status as "accepted" | "purchased" | "in_transit" | "arrived",
+      issuedAt: status === "arrived" ? new Date() : order.issuedAt,
+    },
+  });
+  revalidateStore(storeId);
+}
+
 export async function issueOrder(formData: FormData) {
   const storeId = String(formData.get("storeId") ?? "");
   const orderId = String(formData.get("orderId") ?? "");
@@ -418,8 +731,15 @@ export async function issueOrder(formData: FormData) {
   });
   if (!order || order.storeId !== storeId || order.status !== "reserved") return;
 
-  // Остаток уже списан при резерве
-  await prisma.$transaction(async (tx) => {
+  const productIds = order.lines.map((l) => l.productId).filter(Boolean) as string[];
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, purchasePrice: true, warrantyDays: true },
+  });
+  const productMeta = new Map(products.map((p) => [p.id, p]));
+  const saleNumber = await nextSaleNumber();
+
+  const sale = await prisma.$transaction(async (tx) => {
     for (const line of order.lines) {
       if (line.serial && line.productId) {
         await tx.productSerial.updateMany({
@@ -432,6 +752,35 @@ export async function issueOrder(formData: FormData) {
       where: { id: orderId },
       data: { status: "issued", issuedAt: new Date() },
     });
+    return tx.sale.create({
+      data: {
+        storeId,
+        customerId: order.customerId,
+        sellerUserId: user.id,
+        amount: order.totalAmount,
+        creditAmount: 0,
+        discountTotal: 0,
+        note: `Выдача заказа ${order.number}`,
+        number: saleNumber,
+        lines: {
+          create: order.lines.map((line) => {
+            const meta = line.productId ? productMeta.get(line.productId) : null;
+            return {
+              productId: line.productId,
+              name: line.name,
+              qty: line.qty,
+              unitPrice: line.unitPrice,
+              costPrice: meta?.purchasePrice ?? 0,
+              discountType: "none" as const,
+              discountValue: 0,
+              lineTotal: line.lineTotal,
+              serial: line.serial,
+              warrantyDays: meta?.warrantyDays ?? null,
+            };
+          }),
+        },
+      },
+    });
   });
 
   const rest = order.totalAmount - order.prepaidAmount;
@@ -442,6 +791,7 @@ export async function issueOrder(formData: FormData) {
       direction: "in",
       amount: rest,
       categoryName: "Продажа",
+      saleId: sale.id,
       userId: user.id,
       note: `Выдача ${order.number}`,
     });
@@ -588,7 +938,7 @@ export async function importStockCsv(formData: FormData) {
       },
     },
   });
-  await postStockDocument(doc.id);
+  await postStockDocument(doc.id, user.id);
   revalidateStore(storeId);
   revalidatePath("/settings/import");
 }
@@ -639,4 +989,344 @@ export async function createCustomer(formData: FormData) {
     create: { storeId, name, phone, notes },
   });
   revalidateStore(storeId);
+}
+
+/** Правка устройства: название номенклатуры, гарантия, IMEI, цены, заметка. Все изменения в журнал. */
+export async function updateDevice(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const serialId = String(formData.get("serialId") ?? "");
+  const { user } = await loadStore(storeId);
+  const row = await prisma.productSerial.findUnique({
+    where: { id: serialId },
+    include: { product: true },
+  });
+  if (!row || row.storeId !== storeId) return;
+
+  const name = String(formData.get("name") ?? "").trim();
+  const newSerial = String(formData.get("serial") ?? "").trim();
+  const warrantyDays = Number(formData.get("warrantyDays") ?? row.warrantyDays ?? row.product.warrantyDays);
+  const purchasePrice = Number(formData.get("purchasePrice") ?? row.purchasePrice ?? row.product.purchasePrice);
+  const retailPrice = Number(formData.get("retailPrice") ?? row.retailPrice ?? row.product.retailPrice);
+  const note = String(formData.get("note") ?? "").trim() || null;
+
+  await prisma.$transaction(async (tx) => {
+    if (name && name !== row.product.name) {
+      await tx.product.update({ where: { id: row.productId }, data: { name } });
+      await writeChangeLog(
+        {
+          storeId,
+          userId: user.id,
+          entityType: "product",
+          entityId: row.productId,
+          action: "edit",
+          field: "name",
+          oldValue: row.product.name,
+          newValue: name,
+          summary: `Номенклатура: «${row.product.name}» → «${name}»`,
+          productId: row.productId,
+          serialId: row.id,
+        },
+        tx,
+      );
+    }
+
+    if (newSerial && newSerial !== row.serial) {
+      const clash = await tx.productSerial.findFirst({
+        where: { productId: row.productId, serial: newSerial, NOT: { id: row.id } },
+      });
+      if (clash) throw new Error("Такой IMEI уже есть у этой модели");
+      await tx.productSerial.update({ where: { id: row.id }, data: { serial: newSerial } });
+      await writeChangeLog(
+        {
+          storeId,
+          userId: user.id,
+          entityType: "serial",
+          entityId: row.id,
+          action: "imei_change",
+          field: "serial",
+          oldValue: row.serial,
+          newValue: newSerial,
+          summary: `IMEI изменён: ${row.serial} → ${newSerial}`,
+          productId: row.productId,
+          serialId: row.id,
+          serialOld: row.serial,
+          serialNew: newSerial,
+        },
+        tx,
+      );
+    }
+
+    const prevW = row.warrantyDays ?? row.product.warrantyDays;
+    if (Number.isFinite(warrantyDays) && warrantyDays !== prevW) {
+      await tx.productSerial.update({ where: { id: row.id }, data: { warrantyDays } });
+      await tx.product.update({ where: { id: row.productId }, data: { warrantyDays } });
+      await writeChangeLog(
+        {
+          storeId,
+          userId: user.id,
+          entityType: "serial",
+          entityId: row.id,
+          action: "warranty_change",
+          field: "warrantyDays",
+          oldValue: String(prevW),
+          newValue: String(warrantyDays),
+          summary: `Гарантия: ${prevW} → ${warrantyDays} дн.`,
+          productId: row.productId,
+          serialId: row.id,
+          serialNew: newSerial || row.serial,
+        },
+        tx,
+      );
+    }
+
+    const prevP = row.purchasePrice ?? row.product.purchasePrice;
+    const prevR = row.retailPrice ?? row.product.retailPrice;
+    if (purchasePrice !== prevP || retailPrice !== prevR) {
+      await tx.productSerial.update({
+        where: { id: row.id },
+        data: { purchasePrice, retailPrice },
+      });
+      await tx.product.update({
+        where: { id: row.productId },
+        data: { purchasePrice, retailPrice },
+      });
+      await writeChangeLog(
+        {
+          storeId,
+          userId: user.id,
+          entityType: "serial",
+          entityId: row.id,
+          action: "price_change",
+          summary: `Цены: закуп ${prevP}→${purchasePrice}, розн ${prevR}→${retailPrice}`,
+          productId: row.productId,
+          serialId: row.id,
+          serialNew: newSerial || row.serial,
+          meta: { purchasePrice, retailPrice, prevP, prevR },
+        },
+        tx,
+      );
+    }
+
+    if (note !== (row.note ?? null)) {
+      await tx.productSerial.update({ where: { id: row.id }, data: { note } });
+      await writeChangeLog(
+        {
+          storeId,
+          userId: user.id,
+          entityType: "serial",
+          entityId: row.id,
+          action: "note",
+          field: "note",
+          oldValue: row.note,
+          newValue: note,
+          summary: note ? `Справка/заметка: ${note}` : "Заметка очищена",
+          productId: row.productId,
+          serialId: row.id,
+          serialNew: newSerial || row.serial,
+        },
+        tx,
+      );
+    }
+  });
+
+  revalidateStore(storeId);
+  revalidatePath(`/stores/${storeId}/devices/${serialId}`);
+  revalidatePath(`/catalog/products/${row.productId}`);
+  redirect(`/stores/${storeId}/devices/${serialId}`);
+}
+
+/** Мягкое удаление чека: скрыт из обычных списков, остаётся в истории. Остаток и касса откатываются. */
+export async function softDeleteSale(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const saleId = String(formData.get("saleId") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim() || null;
+  const { user } = await loadStore(storeId);
+
+  const sale = await prisma.sale.findUnique({
+    where: { id: saleId },
+    include: { lines: true, cashTxns: true },
+  });
+  if (!sale || sale.storeId !== storeId || sale.deletedAt) return;
+
+  await prisma.$transaction(async (tx) => {
+    for (const line of sale.lines) {
+      if (line.deletedAt) continue;
+      if (line.productId) {
+        await applyBalance(tx, storeId, line.productId, line.qty);
+      }
+      if (line.serial && line.productId) {
+        const ser = await tx.productSerial.findFirst({
+          where: { productId: line.productId, storeId, serial: line.serial },
+        });
+        if (ser && ser.status === "sold") {
+          await tx.productSerial.update({ where: { id: ser.id }, data: { status: "in_stock" } });
+        }
+      }
+      if (!line.deletedAt) {
+        await tx.saleLine.update({
+          where: { id: line.id },
+          data: { deletedAt: new Date(), deletedById: user.id },
+        });
+      }
+    }
+
+    await tx.sale.update({
+      where: { id: sale.id },
+      data: {
+        deletedAt: new Date(),
+        deletedById: user.id,
+        deletedReason: reason,
+      },
+    });
+
+    await writeChangeLog(
+      {
+        storeId,
+        userId: user.id,
+        entityType: "sale",
+        entityId: sale.id,
+        action: "soft_delete",
+        summary: `Чек ${sale.number ?? sale.id.slice(0, 8)} помечен удалённым${reason ? `: ${reason}` : ""}`,
+        saleId: sale.id,
+        meta: { amount: sale.amount, reason },
+      },
+      tx,
+    );
+  });
+
+  const cashIn = sale.amount - sale.creditAmount;
+  if (cashIn > 0) {
+    const register = await ensureStoreCash(storeId);
+    await postCashTxn({
+      registerId: register.id,
+      direction: "out",
+      amount: cashIn,
+      categoryName: "Сторно продажи",
+      saleId: sale.id,
+      userId: user.id,
+      note: `Удаление чека ${sale.number ?? sale.id.slice(0, 8)}`,
+    });
+  }
+
+  revalidateStore(storeId);
+  revalidatePath(`/stores/${storeId}/sales/${saleId}`);
+  revalidatePath(`/stores/${storeId}/sales`);
+  revalidatePath(`/stores/${storeId}/pos`);
+  revalidatePath(`/stores/${storeId}/reports`);
+  redirect(`/stores/${storeId}/sales/${saleId}`);
+}
+
+/** Мягкое удаление позиции в чеке — позиция с красным ×, чек остаётся. */
+export async function softDeleteSaleLine(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const lineId = String(formData.get("lineId") ?? "");
+  const { user } = await loadStore(storeId);
+
+  const line = await prisma.saleLine.findUnique({
+    where: { id: lineId },
+    include: { sale: true },
+  });
+  if (!line || line.sale.storeId !== storeId || line.deletedAt || line.sale.deletedAt) return;
+
+  await prisma.$transaction(async (tx) => {
+    if (line.productId) {
+      await applyBalance(tx, storeId, line.productId, line.qty);
+    }
+    if (line.serial && line.productId) {
+      const ser = await tx.productSerial.findFirst({
+        where: { productId: line.productId, storeId, serial: line.serial },
+      });
+      if (ser && ser.status === "sold") {
+        await tx.productSerial.update({ where: { id: ser.id }, data: { status: "in_stock" } });
+      }
+    }
+
+    await tx.saleLine.update({
+      where: { id: line.id },
+      data: { deletedAt: new Date(), deletedById: user.id },
+    });
+
+    const activeLines = await tx.saleLine.findMany({
+      where: { saleId: line.saleId, deletedAt: null },
+    });
+    const newAmount = activeLines.reduce((s, l) => s + l.lineTotal, 0);
+    await tx.sale.update({
+      where: { id: line.saleId },
+      data: { amount: newAmount },
+    });
+
+    await writeChangeLog(
+      {
+        storeId,
+        userId: user.id,
+        entityType: "sale_line",
+        entityId: line.id,
+        action: "soft_delete",
+        summary: `Позиция удалена из чека ${line.sale.number ?? line.saleId.slice(0, 8)}: ${line.name}${line.serial ? ` · ${line.serial}` : ""}`,
+        productId: line.productId,
+        serialNew: line.serial,
+        saleId: line.saleId,
+        meta: { lineTotal: line.lineTotal, prevAmount: line.sale.amount, newAmount },
+      },
+      tx,
+    );
+  });
+
+  if (line.lineTotal > 0) {
+    const register = await ensureStoreCash(storeId);
+    await postCashTxn({
+      registerId: register.id,
+      direction: "out",
+      amount: line.lineTotal,
+      categoryName: "Сторно продажи",
+      saleId: line.saleId,
+      userId: user.id,
+      note: `Удаление позиции: ${line.name}`,
+    });
+  }
+
+  revalidateStore(storeId);
+  revalidatePath(`/stores/${storeId}/sales/${line.saleId}`);
+  redirect(`/stores/${storeId}/sales/${line.saleId}`);
+}
+
+/** Мягкое удаление номенклатуры с остатков — скрыта, но видна в истории. */
+export async function softDeleteProduct(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "").trim();
+  const productId = String(formData.get("productId") ?? "");
+  const user = await requireUser();
+  if (!canEditCatalog(user.role)) {
+    if (storeId) redirect(`/stores/${storeId}/stock`);
+    redirect("/catalog/products");
+  }
+
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product || product.deletedAt) return;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.product.update({
+      where: { id: productId },
+      data: { deletedAt: new Date(), deletedById: user.id, active: false },
+    });
+    await writeChangeLog(
+      {
+        storeId: storeId || null,
+        userId: user.id,
+        entityType: "product",
+        entityId: productId,
+        action: "soft_delete",
+        summary: `Номенклатура «${product.name}» помечена удалённой`,
+        productId,
+      },
+      tx,
+    );
+  });
+
+  revalidatePath("/catalog/products");
+  revalidatePath(`/catalog/products/${productId}`);
+  if (storeId) {
+    revalidateStore(storeId);
+    redirect(`/stores/${storeId}/stock?deleted=1`);
+  }
+  redirect(`/catalog/products/${productId}`);
 }

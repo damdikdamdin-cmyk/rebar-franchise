@@ -22,6 +22,7 @@ description: >-
 | LiveSklad | OS route | Приоритет |
 |-----------|----------|-----------|
 | Продажи | `/stores/[id]/pos` | P0 |
+| История чеков (мягкое удаление) | `/stores/[id]/sales` | P0 |
 | Остатки | `/stores/[id]/stock` | P0 |
 | Карточка товара | `/catalog/products/[id]` | P0 |
 | Поступления | `/stores/[id]/receipts` | P0 |
@@ -32,6 +33,7 @@ description: >-
 | Печатные формы | `/settings/print-forms` + `/print/[key]` | P0 |
 | Устройства | `/settings/devices` | P0 |
 | Гарантии | `/stores/[id]/warranty` | P0 |
+| Устройства (S/N, история IMEI) | `/stores/[id]/devices` | P0 |
 | Сводка сети (УК) | `/network` | P0 |
 
 ## Инварианты склада

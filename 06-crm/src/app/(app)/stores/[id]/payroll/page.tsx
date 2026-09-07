@@ -10,7 +10,7 @@ export default async function PayrollPage({ params }: { params: Promise<{ id: st
   since.setDate(since.getDate() - 30);
 
   const sales = await prisma.sale.findMany({
-    where: { storeId: id, soldAt: { gte: since } },
+    where: { storeId: id, soldAt: { gte: since }, deletedAt: null },
     include: { seller: true, lines: { include: { product: true } } },
   });
 
@@ -20,6 +20,7 @@ export default async function PayrollPage({ params }: { params: Promise<{ id: st
   >();
 
   for (const sale of sales) {
+    if (sale.deletedAt) continue;
     const key = sale.sellerUserId ?? "none";
     const name = sale.seller?.name ?? "Без продавца";
     const row = bySeller.get(key) ?? { name, revenue: 0, commission: 0, checks: 0 };

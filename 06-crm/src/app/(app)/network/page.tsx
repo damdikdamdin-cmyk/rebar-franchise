@@ -29,11 +29,11 @@ export default async function NetworkPage({
     prisma.kbArticle.count({ where: { status: "published" } }),
     prisma.task.count({ where: { status: { in: ["pending", "in_progress"] }, dueAt: { lt: now } } }),
     prisma.sale.findMany({
-      where: { soldAt: { gte: periodStart } },
+      where: { soldAt: { gte: periodStart }, deletedAt: null },
       include: { lines: true, store: { select: { id: true, name: true, city: true } } },
     }),
     prisma.sale.findMany({
-      where: { soldAt: { gte: prevStart, lt: periodStart } },
+      where: { soldAt: { gte: prevStart, lt: periodStart }, deletedAt: null },
       select: { amount: true, creditAmount: true },
     }),
   ]);

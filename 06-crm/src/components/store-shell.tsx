@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 const MODULES = [
   { href: "", label: "Обзор", match: "exact" },
   { href: "/pos", label: "Продажи" },
+  { href: "/sales", label: "Чеки" },
+  { href: "/devices", label: "Устройства" },
   { href: "/orders", label: "Заказы" },
   { href: "/stock", label: "Остатки" },
   { href: "/receipts", label: "Поступления" },

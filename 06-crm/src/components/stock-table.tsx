@@ -5,6 +5,8 @@ import Link from "next/link";
 import { PrintActions } from "@/components/print/print-actions";
 import { useBarcodeScanner } from "@/components/print/barcode-scanner";
 import { Badge } from "@/components/ui/fields";
+import { DeletedMark } from "@/components/deleted-mark";
+import { softDeleteProduct } from "@/actions/retail";
 import { rub } from "@/lib/format-client";
 import { cn } from "@/lib/utils";
 
@@ -19,9 +21,18 @@ export type StockRow = {
   otherQty: number;
   retailPrice: number;
   minStock: number;
+  deletedAt?: Date | string | null;
 };
 
-export function StockTable({ storeId, rows }: { storeId: string; rows: StockRow[] }) {
+export function StockTable({
+  storeId,
+  rows,
+  showDelete = true,
+}: {
+  storeId: string;
+  rows: StockRow[];
+  showDelete?: boolean;
+}) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
 
@@ -77,12 +88,18 @@ export function StockTable({ storeId, rows }: { storeId: string; rows: StockRow[
           <>
             <span className="font-mono text-[10px] uppercase text-muted-foreground">выбрано {selected.size}</span>
             <PrintActions label="Печать ценников" actions={printActions} />
-            <button type="button" className="font-mono text-[10px] uppercase text-muted-foreground" onClick={() => setSelected(new Set())}>
+            <button
+              type="button"
+              className="font-mono text-[10px] uppercase text-muted-foreground"
+              onClick={() => setSelected(new Set())}
+            >
               сбросить
             </button>
           </>
         ) : (
-          <span className="font-mono text-[10px] uppercase text-muted-foreground">отметьте позиции для печати ценников</span>
+          <span className="font-mono text-[10px] uppercase text-muted-foreground">
+            отметьте позиции для печати ценников
+          </span>
         )}
       </div>
       <div className="overflow-x-auto border border-border bg-card">
@@ -96,18 +113,36 @@ export function StockTable({ storeId, rows }: { storeId: string; rows: StockRow[
               <th className="px-4 py-3">Другие точки</th>
               <th className="px-4 py-3">Розница</th>
               <th className="px-4 py-3">Печать</th>
+              {showDelete ? <th className="px-4 py-3" /> : null}
             </tr>
           </thead>
           <tbody>
             {filtered.map((b) => (
-              <tr key={b.id} className={cn("border-b border-border last:border-0", selected.has(b.productId) && "bg-accent/40")}>
+              <tr
+                key={b.id}
+                className={cn(
+                  "border-b border-border last:border-0",
+                  selected.has(b.productId) && "bg-accent/40",
+                  b.deletedAt && "bg-red-50/50",
+                )}
+              >
                 <td className="px-3 py-3">
-                  <input type="checkbox" checked={selected.has(b.productId)} onChange={() => toggle(b.productId)} />
+                  <input
+                    type="checkbox"
+                    checked={selected.has(b.productId)}
+                    onChange={() => toggle(b.productId)}
+                  />
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/catalog/products/${b.productId}`} className="hover:underline">
-                    {b.name}
-                  </Link>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      href={`/catalog/products/${b.productId}`}
+                      className={cn("hover:underline", b.deletedAt && "line-through text-muted-foreground")}
+                    >
+                      {b.name}
+                    </Link>
+                    <DeletedMark at={b.deletedAt} compact />
+                  </div>
                   <div className="font-mono text-[10px] text-muted-foreground">
                     Код: {b.code}
                     {b.barcode ? ` · ${b.barcode}` : ""}
@@ -127,18 +162,49 @@ export function StockTable({ storeId, rows }: { storeId: string; rows: StockRow[
                 <td className="px-4 py-3">
                   <PrintActions
                     actions={[
-                      { key: "b", label: "Большой ценник", href: `/print/price_big?store=${storeId}&product=${b.productId}` },
-                      { key: "s", label: "Маленький ценник", href: `/print/price_small?store=${storeId}&product=${b.productId}` },
-                      { key: "l", label: "Этикетка", href: `/print/label_43x25?store=${storeId}&product=${b.productId}` },
+                      {
+                        key: "b",
+                        label: "Большой ценник",
+                        href: `/print/price_big?store=${storeId}&product=${b.productId}`,
+                      },
+                      {
+                        key: "s",
+                        label: "Маленький ценник",
+                        href: `/print/price_small?store=${storeId}&product=${b.productId}`,
+                      },
+                      {
+                        key: "l",
+                        label: "Этикетка",
+                        href: `/print/label_43x25?store=${storeId}&product=${b.productId}`,
+                      },
                     ]}
                   />
                 </td>
+                {showDelete ? (
+                  <td className="px-4 py-3">
+                    {!b.deletedAt ? (
+                      <form action={softDeleteProduct}>
+                        <input type="hidden" name="storeId" value={storeId} />
+                        <input type="hidden" name="productId" value={b.productId} />
+                        <button
+                          type="submit"
+                          className="font-mono text-[10px] uppercase text-red-600"
+                          title="Удалить с остатков (мягко)"
+                        >
+                          ×
+                        </button>
+                      </form>
+                    ) : null}
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Всего позиций — {filtered.length}</p>
+      <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+        Всего позиций — {filtered.length}
+      </p>
     </div>
   );
 }

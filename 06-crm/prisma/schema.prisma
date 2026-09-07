@@ -99,11 +99,20 @@ enum DiscountType {
   percent
 }
 
+enum OrderKind {
+  stock_reserve
+  procurement
+}
+
 enum OrderStatus {
   draft
   reserved
   issued
   cancelled
+  accepted
+  purchased
+  in_transit
+  arrived
 }
 
 enum CashTxnDirection {
@@ -150,10 +159,12 @@ model User {
   passwordResets  PasswordReset[]
   contentItems    ContentItem[]
   sales           Sale[]
+  salesDeleted    Sale[]           @relation("SaleDeletedBy")
   stockDocuments  StockDocument[]
   cashTxns        CashTxn[]
   orders          Order[]
   printTemplates  PrintTemplate[]
+  changeLogs      ChangeLog[]
 }
 
 model PasswordReset {
@@ -238,6 +249,7 @@ model Store {
   stockDocsTo    StockDocument[]  @relation("DocToStore")
   cashRegisters  CashRegister[]
   orders         Order[]
+  changeLogs     ChangeLog[]
 }
 
 // ---------- Воронка УК ----------
@@ -523,23 +535,31 @@ model Customer {
 }
 
 model Sale {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   storeId       String
   customerId    String?
   sellerUserId  String?
   amount        Int
-  creditAmount  Int      @default(0)
-  discountTotal Int      @default(0)
+  creditAmount  Int       @default(0)
+  discountTotal Int       @default(0)
   note          String?
   number        String?
-  soldAt        DateTime @default(now())
-  createdAt     DateTime @default(now())
+  soldAt        DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  /// Мягкое удаление: чек скрыт из списков, но доступен в истории
+  deletedAt     DateTime?
+  deletedById   String?
+  deletedReason String?
 
-  store    Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  customer Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  seller   User?      @relation(fields: [sellerUserId], references: [id], onDelete: SetNull)
-  lines    SaleLine[]
-  cashTxns CashTxn[]
+  store     Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer  Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  seller    User?      @relation(fields: [sellerUserId], references: [id], onDelete: SetNull)
+  deletedBy User?      @relation("SaleDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  lines     SaleLine[]
+  cashTxns  CashTxn[]
+
+  @@index([storeId, deletedAt])
+  @@index([storeId, soldAt])
 }
 
 model SaleLine {
@@ -549,12 +569,16 @@ model SaleLine {
   name          String
   qty           Int          @default(1)
   unitPrice     Int
+  costPrice     Int          @default(0)
   discountType  DiscountType @default(none)
   discountValue Int          @default(0)
   lineTotal     Int
   serial        String?
   note          String?
   warrantyDays  Int?
+  /// Мягкое удаление позиции в чеке
+  deletedAt     DateTime?
+  deletedById   String?
 
   sale    Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
@@ -602,6 +626,9 @@ model Product {
   description   String?
   supplierId    String?
   active        Boolean  @default(true)
+  /// Мягкое удаление номенклатуры — скрыта с остатков, видна в истории
+  deletedAt     DateTime?
+  deletedById   String?
   createdAt     DateTime @default(now())
 
   group      ProductGroup?   @relation(fields: [groupId], references: [id], onDelete: SetNull)
@@ -613,20 +640,27 @@ model Product {
   orderLines OrderLine[]
 
   @@index([barcode])
+  @@index([deletedAt])
 }
 
 model ProductSerial {
-  id        String       @id @default(cuid())
-  productId String
-  storeId   String
-  serial    String
-  status    SerialStatus @default(in_stock)
-  createdAt DateTime     @default(now())
+  id            String       @id @default(cuid())
+  productId     String
+  storeId       String
+  serial        String
+  status        SerialStatus @default(in_stock)
+  purchasePrice Int?
+  retailPrice   Int?
+  warrantyDays  Int?
+  note          String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@unique([productId, serial])
+  @@index([serial])
 }
 
 model StockBalance {
@@ -642,19 +676,21 @@ model StockBalance {
 }
 
 model StockDocument {
-  id          String       @id @default(cuid())
-  number      String
-  type        StockDocType
-  storeId     String
-  toStoreId   String?
-  supplierId  String?
-  customerId  String?
-  userId      String?
-  comment     String?
-  totalAmount Int          @default(0)
-  paidAmount  Int          @default(0)
-  postedAt    DateTime?
-  createdAt   DateTime     @default(now())
+  id             String       @id @default(cuid())
+  number         String
+  type           StockDocType
+  storeId        String
+  toStoreId      String?
+  supplierId     String?
+  customerId     String?
+  userId         String?
+  comment        String?
+  externalNumber String?
+  externalDate   DateTime?
+  totalAmount    Int          @default(0)
+  paidAmount     Int          @default(0)
+  postedAt       DateTime?
+  createdAt      DateTime     @default(now())
 
   store    Store       @relation("DocStore", fields: [storeId], references: [id], onDelete: Cascade)
   toStore  Store?      @relation("DocToStore", fields: [toStoreId], references: [id], onDelete: SetNull)
@@ -665,15 +701,17 @@ model StockDocument {
 }
 
 model StockLine {
-  id         String  @id @default(cuid())
-  documentId String
-  productId  String
-  qty        Int
-  qtyAccount Int     @default(0)
-  qtyActual  Int     @default(0)
-  price      Int     @default(0)
-  serial     String?
-  note       String?
+  id           String  @id @default(cuid())
+  documentId   String
+  productId    String
+  qty          Int
+  qtyAccount   Int     @default(0)
+  qtyActual    Int     @default(0)
+  price        Int     @default(0)
+  retailPrice  Int     @default(0)
+  warrantyDays Int?
+  serial       String?
+  note         String?
 
   document StockDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
   product  Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
@@ -728,10 +766,12 @@ model Order {
   storeId       String
   customerId    String?
   userId        String?
+  kind          OrderKind   @default(stock_reserve)
   status        OrderStatus @default(draft)
   totalAmount   Int         @default(0)
   prepaidAmount Int         @default(0)
   comment       String?
+  dueAt         DateTime?
   createdAt     DateTime    @default(now())
   issuedAt      DateTime?
 
@@ -775,4 +815,38 @@ model PrintTemplate {
   updatedAt    DateTime @updatedAt
 
   updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+/// Журнал изменений: номенклатура, IMEI, цены, гарантия, продажи, чеки.
+/// Старый IMEI ищется по serialOld — историю нельзя «стереть» сменой номера.
+model ChangeLog {
+  id           String   @id @default(cuid())
+  storeId      String?
+  userId       String?
+  entityType   String
+  entityId     String
+  action       String
+  summary      String
+  field        String?
+  oldValue     String?
+  newValue     String?
+  productId    String?
+  serialId     String?
+  serialOld    String?
+  serialNew    String?
+  saleId       String?
+  stockDocId   String?
+  meta         String?
+  createdAt    DateTime @default(now())
+
+  store Store? @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([productId])
+  @@index([serialId])
+  @@index([serialOld])
+  @@index([serialNew])
+  @@index([saleId])
+  @@index([storeId, createdAt])
 }

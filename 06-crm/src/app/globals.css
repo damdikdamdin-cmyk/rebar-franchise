@@ -147,7 +147,8 @@
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans), system-ui, sans-serif;
-    font-feature-settings: "ss01", "cv11";
+    /* cv11 — вариант Manrope; ss01 у Unbounded превращает цифры в ①②③ — не включать глобально */
+    font-feature-settings: "cv11";
   }
   ::selection {
     background: var(--ink);
@@ -167,6 +168,11 @@
   font-family: var(--font-serif);
   letter-spacing: -0.02em;
   line-height: 1;
+  font-feature-settings: normal;
+}
+
+.font-serif {
+  font-feature-settings: normal;
 }
 
 /* Markdown body */
