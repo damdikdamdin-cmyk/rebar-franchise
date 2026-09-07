@@ -28,7 +28,7 @@ export default async function TeamPage() {
     <div className="mx-auto max-w-3xl space-y-8">
       <header>
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Доступ</p>
-        <h1 className="mt-1 font-serif text-4xl italic">Команда и приглашения</h1>
+        <h1 className="mt-1 font-serif text-4xl">Команда и приглашения</h1>
       </header>
 
       <form action={createInvite} className="grid gap-3 border border-border bg-card p-4 sm:grid-cols-2">

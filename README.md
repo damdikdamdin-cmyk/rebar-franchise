@@ -1,36 +1,37 @@
 # re:bar — франшиза электроники
 
-Один репозиторий, три параллельных потока работы — каждый в своём чате Cursor.
+Один репозиторий: лендинг, презентация, юрпакет, маркетинг и **единая платформа re:bar OS** (франшиза + розница).
+
+## Для команды — первые тесты
+
+См. **[TEAM-TEST.md](./TEAM-TEST.md)** — клон, запуск, логины, чеклист.
+
+Кратко:
+
+```bash
+cd 06-crm && cp .env.example .env && npm install
+npx prisma db push && npm run db:seed && npm run kb:import
+npm run dev   # http://localhost:3100
+```
+
+Пароль демо: `rebar-os`
 
 ## Структура
 
 ```
 rebar-franchise/
-├── _shared/strategy/       # Общая стратегия УК (все чаты читают отсюда)
-├── 01-landing/             # Чат 1 — лендинг
-├── 02-presentation/        # Чат 2 — презентация
-├── 03-crm-and-ops/         # Чат 3 — CRM, продажи, запуск, юрдокументы
-├── skills-source/          # Исходные .skill из Claude Code
-└── .cursor/skills/         # Скилы Cursor (общие для всех чатов)
+├── TEAM-TEST.md            # инструкция для тестеров
+├── _shared/strategy/       # стратегия УК
+├── 01-landing/             # лендинг (заявки → OS :3100)
+├── 02-presentation/        # презентация
+├── 03-crm-and-ops/         # скрипты, запуск, юрдокументы
+├── 04-marketing/           # маркетинг-материалы
+├── 05-hub/                 # архив Hub (redirect → OS)
+├── 06-crm/                 # ★ re:bar OS — основная система
+└── .cursor/skills/         # скилы Cursor
 ```
-
-## Как открыть три чата
-
-| Чат | Папка для открытия в Cursor | Первое сообщение агенту |
-|-----|----------------------------|-------------------------|
-| **1. Лендинг** | `01-landing/` | «Работаем над лендингом re:bar. Актуальный файл — index.html. Читай _shared/strategy/ для контекста.» |
-| **2. Презентация** | `02-presentation/` | «Работаем над презентацией re:bar. Актуальная версия — current/rebar_Презентация_v4.1.pdf. Цель — v5.» |
-| **3. CRM и документы** | `03-crm-and-ops/` | «Настраиваем CRM и упаковываем документы re:bar. Скрипты — в sales/, методичка — в launch/.» |
-
-> Можно открыть и корень `rebar-franchise/` — но в каждом чате указывайте агенту, **какую папку не трогать**.
-
-## Общие правила
-
-- Стратегия УК — только в `_shared/strategy/` (не дублировать)
-- Скил `rebar-franchise` в `.cursor/skills/` — общий контекст бренда
-- Юрдокументы — только в `03-crm-and-ops/legal/`
-- Новые файлы кладите в папку своего потока
 
 ## Контакты
 
-Founder: Дамдин Цыпылов · damdikdamdin@gmail.com
+Founder: Дамдин Цыпылов · damdikdamdin@gmail.com  
+Репозиторий: https://cursor.com/codebase/damdikdamdin/rebar-franchise

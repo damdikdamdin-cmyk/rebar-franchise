@@ -18,7 +18,7 @@ export default async function InvitePage({
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-      <p className="font-serif text-2xl italic">re:bar Hub</p>
+      <p className="font-serif text-2xl">re:bar Hub</p>
       {invalid ? (
         <p className="mt-6 text-sm text-muted-foreground">Приглашение недействительно или уже использовано.</p>
       ) : (
@@ -27,7 +27,7 @@ export default async function InvitePage({
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             {ROLE_LABEL[invite.role]} · {invite.email}
           </p>
-          <h1 className="font-serif text-3xl italic">Принять приглашение</h1>
+          <h1 className="font-serif text-3xl">Принять приглашение</h1>
           {error ? <p className="text-sm text-destructive">Проверьте имя и пароль (от 6 символов).</p> : null}
           <div className="space-y-1">
             <Label htmlFor="name">Имя</Label>

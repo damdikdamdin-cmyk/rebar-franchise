@@ -40,8 +40,11 @@ export const MANIFEST: ManifestDoc[] = [
 
   // Продажи франшизы
   { space: "sales", slug: "sales-scripts-faq", title: "Скрипты продаж и FAQ", path: "03-crm-and-ops/sales/01_Скрипты_продаж_и_FAQ.docx", tags: "продажи,скрипты,FAQ" },
-  { space: "sales", slug: "deck-v5-1", title: "Презентация для франчайзи v5.1 — текст", path: "02-presentation/source/v5.1-content.md", tags: "продажи,презентация" },
-  { space: "sales", slug: "invest-memo-v5", title: "Инвест-меморандум v5 — текст", path: "02-presentation/source/v5-content.md", tags: "продажи,презентация" },
+  { space: "sales", slug: "deck-v6", title: "Презентация франшизы v6 — текст слайдов", path: "02-presentation/source/v6-content.md", tags: "продажи,презентация" },
+  { space: "sales", slug: "deck-v6-analysis", title: "Аналитика презентации v6 (PPTX)", path: "02-presentation/source/v6-pptx-analysis.md", tags: "продажи,презентация,анализ" },
+  { space: "sales", slug: "first-call-deck-finmodel", title: "Первый звонок: презентация v6 + финмодель", path: "03-crm-and-ops/sales/02_Первый_звонок_презентация_и_финмодель.md", tags: "продажи,звонок,финмодель" },
+  { space: "sales", slug: "deck-v5-1", title: "Презентация для франчайзи v5.1 — текст (архив HTML)", path: "02-presentation/source/v5.1-content.md", tags: "продажи,презентация,архив" },
+  { space: "sales", slug: "invest-memo-v5", title: "Инвест-меморандум v5 — текст (архив)", path: "02-presentation/source/v5-content.md", tags: "продажи,презентация,архив" },
   { space: "sales", slug: "ops-overview", title: "CRM, продажи, запуск: обзор потоков", path: "03-crm-and-ops/README.md", tags: "обзор" },
 
   // Маркетинг
@@ -63,6 +66,7 @@ export const MANIFEST: ManifestDoc[] = [
 
   // Розница и операции
   { space: "retail", slug: "chek-list-rabochego-dnya", title: "Чек-лист рабочего дня: продавец и старший смены", path: "03-crm-and-ops/launch/02_Чек-лист_рабочего_дня_продавец_и_старший_смены.docx", tags: "розница,смена" },
+  { space: "retail", slug: "print-docs-index", title: "Печатные бланки точки (акты, согласия, договоры)", path: "03-crm-and-ops/retail/print-docs/README.md", tags: "розница,печать,гарантия" },
   { space: "retail", slug: "cutover-hub", title: "Переход с LiveSklad на Hub: чеклист", path: "03-crm-and-ops/crm/cutover-ulan-irkutsk.md", tags: "розница,hub", roles: "founder,uk_admin,uk_curator,store_manager" },
   { space: "retail", slug: "landing-status", title: "Лендинг и интеграция заявок", path: "01-landing/README.md", tags: "лендинг", roles: "founder,uk_admin,uk_marketer,uk_sales" },
 ];
@@ -109,7 +113,8 @@ export const COURSES: CourseSeed[] = [
     lessons: [
       { title: "Стратегия: отдел продаж", articleSlug: "strategiya-uk-08", checklist: ["Знаю стадии воронки", "Знаю офер и промо для первых партнёров"] },
       { title: "Скрипты и FAQ", articleSlug: "sales-scripts-faq", checklist: ["Прошёл скрипт первого звонка", "Знаю ответы на 20 вопросов FAQ"] },
-      { title: "Презентация v5.1", articleSlug: "deck-v5-1", checklist: ["Могу провести Zoom по слайдам"] },
+      { title: "Презентация v6 + финмодель на звонке", articleSlug: "first-call-deck-finmodel", checklist: ["Знаю сценарий 15 мин → Zoom 45 мин", "Могу провести Zoom по PPTX v6", "Умею открыть финмодель под город партнёра"] },
+      { title: "Текст слайдов v6", articleSlug: "deck-v6", checklist: ["Знаю цифры 994K / 544K и промо 100K"] },
       { title: "Юрпакет для менеджера", articleSlug: "legal-readme", checklist: ["Знаю порядок подписания: NDA → лицензия → услуги"] },
     ],
   },

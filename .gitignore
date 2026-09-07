@@ -8,6 +8,7 @@
 .env.*
 !.env.example
 *.pem
+*.b64
 
 # node / next
 node_modules/
@@ -25,6 +26,10 @@ npm-debug.log*
 
 # CRM: скопированные оригиналы документов (пересобираются `npm run kb:import`)
 06-crm/public/kb-files/
+
+# finance scratch / uploads
+_shared/finance/pnl-upload.b64
+_shared/finance/pnl-mcp-args.json
 
 # playwright
 test-results/

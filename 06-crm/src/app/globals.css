@@ -1,6 +1,23 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Фирменная пара: Unbounded — кириллица, цифры и знаки; Anita Semi-square — латинские буквы.
+   Объявляем как одну семью с unicode-range, чтобы браузер сам подбирал глиф по алфавиту. */
+@font-face {
+  font-family: "Rebar Display";
+  src: url("/fonts/unbounded.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Rebar Display";
+  src: url("/fonts/anita-semi-square.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+0041-005A, U+0061-007A, U+003A;
+}
+
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -111,7 +128,7 @@
   --color-sidebar-muted: var(--sidebar-muted);
   --color-sidebar-accent: var(--sidebar-accent);
   --font-sans: var(--font-manrope);
-  --font-serif: var(--font-instrument);
+  --font-serif: "Rebar Display", var(--font-manrope), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains);
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
@@ -148,7 +165,6 @@
 
 @utility display {
   font-family: var(--font-serif);
-  font-style: italic;
   letter-spacing: -0.02em;
   line-height: 1;
 }
@@ -158,8 +174,8 @@
   line-height: 1.65;
   font-size: 15px;
 }
-.prose-kb h1 { font-family: var(--font-serif); font-style: italic; font-size: 2rem; line-height: 1.1; margin: 1.5rem 0 0.75rem; }
-.prose-kb h2 { font-family: var(--font-serif); font-style: italic; font-size: 1.5rem; line-height: 1.15; margin: 2rem 0 0.6rem; }
+.prose-kb h1 { font-family: var(--font-serif); font-size: 2rem; line-height: 1.1; margin: 1.5rem 0 0.75rem; }
+.prose-kb h2 { font-family: var(--font-serif); font-size: 1.5rem; line-height: 1.15; margin: 2rem 0 0.6rem; }
 .prose-kb h3 { font-weight: 600; font-size: 1.05rem; margin: 1.5rem 0 0.4rem; }
 .prose-kb h4 { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); margin: 1.25rem 0 0.4rem; }
 .prose-kb p { margin: 0.6rem 0; }
@@ -181,4 +197,12 @@
 
 @media print {
   .no-print { display: none !important; }
+}
+
+
+/* Равный зазор вокруг «:» в логотипе re:bar */
+.brand-colon {
+  display: inline-block;
+  padding-inline: 0.14em;
+  margin-inline: 0;
 }

@@ -120,6 +120,7 @@ model User {
   stockDocuments  StockDocument[]
   cashTxns        CashTxn[]
   orders          Order[]
+  printTemplates  PrintTemplate[]
 }
 
 model Invite {
@@ -170,6 +171,11 @@ model Store {
   openedAt  DateTime?
   address   String?
   phone     String?
+  /// Реквизиты юрлица точки для печатных форм (пусто → из COMPANY_* в .env)
+  legalName    String?
+  inn          String?
+  ogrn         String?
+  legalAddress String?
   createdAt DateTime    @default(now())
 
   partner        Partner?         @relation(fields: [partnerId], references: [id], onDelete: SetNull)
@@ -266,6 +272,7 @@ model SaleLine {
   lineTotal     Int
   serial        String?
   note          String?
+  warrantyDays  Int?
 
   sale    Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
@@ -355,6 +362,8 @@ model Product {
   lines    StockLine[]
   saleLines SaleLine[]
   orderLines OrderLine[]
+
+  @@index([barcode])
 }
 
 model ProductSerial {
@@ -495,4 +504,28 @@ model OrderLine {
 
   order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+}
+
+/// Печатная форма: HTML-шаблон с переменными <Имя> (см. lib/print/variables.ts).
+/// scope — с каким объектом печатается: sale (чек/гарантия), product (ценник/этикетка),
+/// stock_doc (накладная), customer (акты/согласия/договоры), free (бланк без данных).
+model PrintTemplate {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  scope       String
+  html        String
+  pageWidthMm Int      @default(210)
+  pageHeightMm Int     @default(297)
+  marginMm    Int      @default(10)
+  fontSizePt  Int      @default(11)
+  sortOrder   Int      @default(0)
+  isSystem    Boolean  @default(false)
+  active      Boolean  @default(true)
+  sourceFile  String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
 }

@@ -24,7 +24,7 @@ export default async function LearnPage() {
         title="Курсы"
         description="Курсы назначаются автоматически по роли. Каждый урок — статья базы знаний и чек-лист «изучил»."
         actions={
-          isUk(user.role) ? (
+          isUk(user.role) || user.role === "partner" ? (
             <Button asChild variant="outline">
               <Link href="/learn/progress">Прогресс команды</Link>
             </Button>

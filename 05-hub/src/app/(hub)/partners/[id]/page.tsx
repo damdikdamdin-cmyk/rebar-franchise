@@ -23,7 +23,7 @@ export default async function PartnerPage({ params }: { params: Promise<{ id: st
         <Link href="/partners" className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
           ← Партнёры
         </Link>
-        <h1 className="mt-2 font-serif text-4xl italic">{partner.name}</h1>
+        <h1 className="mt-2 font-serif text-4xl">{partner.name}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {partner.city} · {FORMAT_LABEL[partner.format]}
           {partner.signedAt ? ` · договор ${shortDate(partner.signedAt)}` : ""}

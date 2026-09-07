@@ -23,7 +23,7 @@ export default async function PipelinePage() {
     <div className="space-y-6">
       <header>
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Продажа франшизы</p>
-        <h1 className="mt-1 font-serif text-4xl italic">Воронка УК</h1>
+        <h1 className="mt-1 font-serif text-4xl">Воронка УК</h1>
       </header>
       <div className="flex gap-3 overflow-x-auto pb-4">
         {byStage.map((col) => (

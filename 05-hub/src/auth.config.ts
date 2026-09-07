@@ -1,7 +1,7 @@
 import type { NextAuthConfig } from "next-auth";
 import type { Role } from "@prisma/client";
 
-const publicPrefixes = ["/login", "/invite", "/api/leads", "/api/auth"];
+const publicPrefixes = ["/login", "/invite", "/api/leads", "/api/auth", "/fonts/"];
 
 export const authConfig = {
   trustHost: true,

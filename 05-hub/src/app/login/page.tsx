@@ -1,3 +1,4 @@
+import { BrandMark } from "@/components/brand-mark";
 import { loginAction } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/fields";
@@ -11,10 +12,10 @@ export default async function LoginPage({
   return (
     <div className="flex min-h-screen bg-background">
       <div className="hidden w-[42%] flex-col justify-between bg-foreground px-10 py-10 text-background md:flex">
-        <p className="font-serif text-3xl italic">re:bar</p>
+        <BrandMark className="text-3xl" />
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-background/50">Закрытая сеть</p>
-          <h1 className="mt-3 max-w-sm font-serif text-4xl italic leading-tight">Одна система на всю франшизу.</h1>
+          <h1 className="mt-3 max-w-sm font-serif text-4xl leading-tight">Одна система на всю франшизу.</h1>
           <p className="mt-4 max-w-sm text-sm text-background/70">
             Воронка УК, запуск партнёра и розница точек — в одном контуре. Только по приглашению.
           </p>
@@ -25,7 +26,7 @@ export default async function LoginPage({
         <form action={loginAction} className="w-full max-w-sm space-y-4">
           <div>
             <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Вход</p>
-            <h2 className="mt-1 font-serif text-3xl italic">re:bar Hub</h2>
+            <h2 className="mt-1 font-serif text-3xl"><BrandMark /> Hub</h2>
           </div>
           {params.error ? (
             <p className="border border-destructive/40 px-3 py-2 text-sm text-destructive">Неверный email или пароль.</p>

@@ -31,7 +31,7 @@ export default async function ProductsPage({
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Справочник</p>
-          <h1 className="mt-1 font-serif text-4xl italic">Товары</h1>
+          <h1 className="mt-1 font-serif text-4xl">Товары</h1>
         </div>
         <Link href="/catalog/products/new">
           <Button>+ Товар</Button>

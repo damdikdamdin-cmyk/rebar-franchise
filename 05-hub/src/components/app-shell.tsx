@@ -4,6 +4,7 @@ import { logoutAction } from "@/actions/auth";
 import { canAccessPipeline, canAccessTeam, isUk, ROLE_LABEL, type SessionUser } from "@/lib/access";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
+import { BrandMark } from "@/components/brand-mark";
 
 const NAV = [
   { href: "/", label: "Сводка", show: () => true },
@@ -12,6 +13,8 @@ const NAV = [
   { href: "/stores", label: "Точки", show: () => true },
   { href: "/catalog/products", label: "Товары", show: () => true },
   { href: "/settings/team", label: "Команда", show: (u: SessionUser) => canAccessTeam(u.role) },
+  { href: "/settings/print-forms", label: "Печать", show: () => true },
+  { href: "/settings/devices", label: "Устройства", show: () => true },
   { href: "/settings/import", label: "Импорт", show: (u: SessionUser) => canAccessTeam(u.role) },
 ];
 
@@ -21,7 +24,7 @@ export function AppShell({ user, children }: { user: SessionUser; children: Reac
       <aside className="flex flex-col border-b border-border bg-foreground text-background lg:min-h-screen lg:border-b-0 lg:border-r">
         <div className="flex items-baseline justify-between gap-3 px-5 py-5 lg:block">
           <Link href="/" className="block">
-            <span className="font-serif text-2xl italic tracking-tight">re:bar</span>
+            <BrandMark className="text-2xl" />
             <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.22em] opacity-60">Hub</span>
           </Link>
           <p className="hidden font-mono text-[10px] uppercase tracking-[0.16em] text-background/50 lg:mt-3 lg:block">

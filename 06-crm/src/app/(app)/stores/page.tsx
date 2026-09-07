@@ -14,7 +14,7 @@ export default async function StoresPage() {
   });
   return (
     <div>
-      <PageHeader eyebrow={`${stores.length} точек`} title="Точки" description="Розничный учёт (продажи, склад, касса) ведётся в re:bar Hub. Здесь — карточка, команда и стандарты." />
+      <PageHeader eyebrow={`${stores.length} точек`} title="Точки" description="Карточка точки, команда, POS, склад и касса — в одной платформе re:bar OS." />
       <Card className="divide-y divide-border">
         {stores.map((s) => (
           <Link key={s.id} href={`/stores/${s.id}`} className="flex flex-wrap items-center gap-4 px-5 py-4 hover:bg-accent">

@@ -23,7 +23,7 @@ export default async function StoresPage() {
     <div className="space-y-6">
       <header>
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Розница</p>
-        <h1 className="mt-1 font-serif text-4xl italic">Точки сети</h1>
+        <h1 className="mt-1 font-serif text-4xl">Точки сети</h1>
       </header>
       <ul className="grid gap-3 md:grid-cols-2">
         {stores.map((store) => {

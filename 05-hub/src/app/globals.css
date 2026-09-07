@@ -1,6 +1,23 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Фирменная пара: Unbounded — кириллица, цифры и знаки; Anita Semi-square — латинские буквы.
+   Объявляем как одну семью с unicode-range, чтобы браузер сам подбирал глиф по алфавиту. */
+@font-face {
+  font-family: "Rebar Display";
+  src: url("/fonts/unbounded.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Rebar Display";
+  src: url("/fonts/anita-semi-square.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+  unicode-range: U+0041-005A, U+0061-007A, U+003A;
+}
+
+
 :root {
   --background: hsl(210 9% 97%);
   --foreground: hsl(220 13% 5%);
@@ -91,7 +108,7 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
   --font-sans: var(--font-manrope);
-  --font-serif: var(--font-instrument);
+  --font-serif: "Rebar Display", var(--font-manrope), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains);
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
@@ -110,4 +127,22 @@
   html {
     letter-spacing: -0.01em;
   }
+}
+
+
+/* Редактор печатных форм */
+.prose-print p { margin: 0 0 0.35em; line-height: 1.35; }
+.prose-print h2 { font-size: 1.4em; margin: 0 0 0.5em; font-weight: 700; }
+.prose-print table { width: 100%; border-collapse: collapse; margin: 0 0 0.6em; }
+.prose-print td, .prose-print th { border: 1px solid #000; padding: 2px 4px; vertical-align: top; text-align: left; }
+.prose-print th { font-weight: 700; }
+.prose-print img { max-width: 100%; }
+.prose-print .ProseMirror { outline: none; min-height: 420px; }
+
+
+/* Равный зазор вокруг «:» в логотипе re:bar */
+.brand-colon {
+  display: inline-block;
+  padding-inline: 0.14em;
+  margin-inline: 0;
 }

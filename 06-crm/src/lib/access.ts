@@ -51,6 +51,23 @@ export function canManageTeam(role: Role) {
   return isAdmin(role);
 }
 
+/** Alias для печатных форм / розничных настроек (совместимость с Hub). */
+export function canAccessTeam(role: Role) {
+  return canManageTeam(role);
+}
+
+export function canAccessRetail(role: Role) {
+  return isUk(role) || role === "partner" || STORE_ROLES.includes(role);
+}
+
+export function canEditCatalog(role: Role) {
+  return isUk(role) || role === "partner" || role === "store_manager";
+}
+
+export function canAccessRetailAnalytics(role: Role) {
+  return isAdmin(role) || role === "uk_curator";
+}
+
 export function canInviteToPartner(user: SessionUser, partnerId: string) {
   if (isAdmin(user.role) || user.role === "uk_curator") return true;
   return user.role === "partner" && user.partnerId === partnerId;

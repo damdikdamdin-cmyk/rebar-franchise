@@ -1,9 +1,13 @@
 import { dateTime, rub } from "@/lib/format";
 import { Badge } from "@/components/ui/fields";
 
+import { PrintActions } from "@/components/print/print-actions";
+
 export function DocTable({
   docs,
   total,
+  storeId,
+  printKey = "stock_receipt",
 }: {
   docs: Array<{
     id: string;
@@ -17,6 +21,8 @@ export function DocTable({
     user?: { name: string } | null;
   }>;
   total: number;
+  storeId?: string;
+  printKey?: string;
 }) {
   return (
     <div>
@@ -31,6 +37,7 @@ export function DocTable({
               <th className="px-4 py-3">Оплачено</th>
               <th className="px-4 py-3">Статус</th>
               <th className="px-4 py-3">Комментарий</th>
+              <th className="px-4 py-3">Печать</th>
             </tr>
           </thead>
           <tbody>
@@ -45,6 +52,18 @@ export function DocTable({
                   <Badge tone={d.postedAt ? "open" : "steel"}>{d.postedAt ? "проведён" : "черновик"}</Badge>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{d.comment ?? "—"}</td>
+                <td className="px-4 py-3">
+                  {storeId ? (
+                    <PrintActions
+                      actions={[
+                        { key: "doc", label: "Накладная", href: `/print/${printKey}?doc=${d.id}&store=${storeId}` },
+                        { key: "tags", label: "Ценники позиций", href: `/stores/${storeId}/stock` },
+                      ]}
+                    />
+                  ) : (
+                    "—"
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

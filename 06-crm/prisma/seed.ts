@@ -10,7 +10,7 @@ const SPACES = [
   { slug: "launch", name: "Запуск партнёра", icon: "rocket", description: "Методичка 60–90 дней, открытие, маркетинг открытия.", visibleRoles: "founder,uk_admin,uk_curator,uk_marketer,partner,store_manager", sortOrder: 3 },
   { slug: "sales", name: "Продажи франшизы", icon: "phone", description: "Скрипты, FAQ, презентация, работа с заявками.", visibleRoles: "founder,uk_admin,uk_sales", sortOrder: 4 },
   { slug: "marketing", name: "Маркетинг", icon: "megaphone", description: "Планы, контент, креативы, аналитика, стратегия розницы.", visibleRoles: "founder,uk_admin,uk_marketer,uk_curator,partner", sortOrder: 5 },
-  { slug: "retail", name: "Розница и операции", icon: "store", description: "Рабочий день точки, стандарты, переход на Hub.", visibleRoles: "", sortOrder: 6 },
+  { slug: "retail", name: "Розница и операции", icon: "store", description: "Рабочий день точки, стандарты, POS и склад в OS.", visibleRoles: "", sortOrder: 6 },
 ];
 
 async function main() {
@@ -30,6 +30,22 @@ async function main() {
   await prisma.campaign.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.task.deleteMany();
+  await prisma.cashTxn.deleteMany();
+  await prisma.cashRegister.deleteMany();
+  await prisma.cashCategory.deleteMany();
+  await prisma.orderLine.deleteMany();
+  await prisma.order.deleteMany();
+  await prisma.saleLine.deleteMany();
+  await prisma.sale.deleteMany();
+  await prisma.stockLine.deleteMany();
+  await prisma.stockDocument.deleteMany();
+  await prisma.productSerial.deleteMany();
+  await prisma.stockBalance.deleteMany();
+  await prisma.product.deleteMany();
+  await prisma.productGroup.deleteMany();
+  await prisma.supplier.deleteMany();
+  await prisma.customer.deleteMany();
+  await prisma.printTemplate.deleteMany();
   await prisma.launchTask.deleteMany();
   await prisma.launchProject.deleteMany();
   await prisma.leadActivity.deleteMany();
@@ -56,17 +72,182 @@ async function main() {
   });
 
   const ulan = await prisma.store.create({
-    data: { name: "re:bar Улан-Удэ", city: "Улан-Удэ", kind: "owned", format: "flagship", status: "open", openedAt: new Date("2025-03-01"), address: "ТРЦ Galaxy" },
+    data: {
+      name: "re:bar Улан-Удэ",
+      city: "Улан-Удэ",
+      kind: "owned",
+      format: "flagship",
+      status: "open",
+      openedAt: new Date("2025-03-01"),
+      address: "ТРЦ Galaxy",
+      legalName: "ИП Цыпылова Сарюна Баяржаповна",
+    },
   });
   const irkutsk = await prisma.store.create({
     data: { name: "re:bar Иркутск", city: "Иркутск", kind: "owned", format: "standard", status: "open", openedAt: new Date("2021-06-01") },
   });
 
-  await prisma.user.create({
-    data: { email: "ulan@rebar.local", name: "Управляющий Улан-Удэ", role: "store_manager", storeId: ulan.id, passwordHash, onboardedAt: new Date() },
+  const ulanManager = await prisma.user.create({
+    data: {
+      email: "ulan@rebar.local",
+      name: "Управляющий Улан-Удэ",
+      role: "store_manager",
+      storeId: ulan.id,
+      passwordHash,
+      commissionPct: 2,
+      onboardedAt: new Date(),
+    },
   });
   await prisma.user.create({
-    data: { email: "irkutsk@rebar.local", name: "Продавец Иркутск", role: "seller", storeId: irkutsk.id, passwordHash, onboardedAt: new Date() },
+    data: { email: "irkutsk@rebar.local", name: "Продавец Иркутск", role: "seller", storeId: irkutsk.id, passwordHash, commissionPct: 2, onboardedAt: new Date() },
+  });
+
+  // --- Розница: каталог, остатки, касса ---
+  const supplier = await prisma.supplier.create({
+    data: { name: "Поставщик МСК", phone: "+7 495 000-00-00" },
+  });
+  const apple = await prisma.productGroup.create({ data: { name: "Apple", sortOrder: 1 } });
+  const phones = await prisma.productGroup.create({
+    data: { name: "Телефоны Apple", parentId: apple.id, sortOrder: 1 },
+  });
+  const accessories = await prisma.productGroup.create({ data: { name: "Аксессуары", sortOrder: 2 } });
+  const cases = await prisma.productGroup.create({
+    data: { name: "Чехлы", parentId: accessories.id, sortOrder: 1 },
+  });
+  await prisma.productGroup.create({ data: { name: "Samsung", sortOrder: 3 } });
+
+  const iphone = await prisma.product.create({
+    data: {
+      code: "270",
+      name: "Apple iPhone 16 Pro 256GB Black",
+      groupId: phones.id,
+      supplierId: supplier.id,
+      serialTracked: true,
+      purchasePrice: 98900,
+      retailPrice: 124900,
+      repairPrice: 119900,
+      preorderPrice: 129900,
+      warrantyDays: 365,
+      minStock: 1,
+      commissionPct: 1,
+    },
+  });
+  const airpods = await prisma.product.create({
+    data: {
+      code: "512",
+      name: "AirPods Pro 2",
+      groupId: accessories.id,
+      supplierId: supplier.id,
+      purchasePrice: 14900,
+      retailPrice: 18900,
+      warrantyDays: 365,
+      minStock: 3,
+      commissionPct: 3,
+    },
+  });
+  const charger = await prisma.product.create({
+    data: {
+      code: "189",
+      name: "СЗУ 20W",
+      groupId: accessories.id,
+      purchasePrice: 1800,
+      retailPrice: 3000,
+      warrantyDays: 90,
+      minStock: 5,
+      commissionRub: 100,
+    },
+  });
+  const caseProd = await prisma.product.create({
+    data: {
+      code: "301",
+      name: "Silicon case 16 Pro",
+      groupId: cases.id,
+      purchasePrice: 900,
+      retailPrice: 1800,
+      warrantyDays: 30,
+      minStock: 5,
+    },
+  });
+
+  await prisma.stockBalance.createMany({
+    data: [
+      { storeId: ulan.id, productId: iphone.id, qty: 3 },
+      { storeId: ulan.id, productId: airpods.id, qty: 8 },
+      { storeId: ulan.id, productId: charger.id, qty: 12 },
+      { storeId: ulan.id, productId: caseProd.id, qty: 15 },
+      { storeId: irkutsk.id, productId: iphone.id, qty: 2 },
+      { storeId: irkutsk.id, productId: airpods.id, qty: 5 },
+      { storeId: irkutsk.id, productId: charger.id, qty: 10 },
+      { storeId: irkutsk.id, productId: caseProd.id, qty: 20 },
+    ],
+  });
+  await prisma.productSerial.createMany({
+    data: [
+      { productId: iphone.id, storeId: ulan.id, serial: "SN-UU-001", status: "in_stock" },
+      { productId: iphone.id, storeId: ulan.id, serial: "SN-UU-002", status: "in_stock" },
+      { productId: iphone.id, storeId: ulan.id, serial: "SN-UU-003", status: "in_stock" },
+      { productId: iphone.id, storeId: irkutsk.id, serial: "SN-IRK-001", status: "in_stock" },
+      { productId: iphone.id, storeId: irkutsk.id, serial: "SN-IRK-002", status: "in_stock" },
+    ],
+  });
+  await prisma.cashCategory.createMany({
+    data: [
+      { name: "Продажа", direction: "in", system: true },
+      { name: "Предоплата заказа", direction: "in", system: true },
+      { name: "Оплата поставщику", direction: "out", system: true },
+      { name: "Возврат клиенту", direction: "out", system: true },
+      { name: "Выдача учредителю", direction: "out", system: false },
+      { name: "Логистика", direction: "out", system: false },
+      { name: "Прочий приход", direction: "in", system: false },
+      { name: "Прочий расход", direction: "out", system: false },
+    ],
+  });
+  await prisma.cashRegister.createMany({
+    data: [
+      { storeId: ulan.id, name: "Касса Улан-Удэ", balance: 150000 },
+      { storeId: irkutsk.id, name: "Касса Иркутск", balance: 98000 },
+    ],
+  });
+
+  const daysAgo = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return d;
+  };
+  const c1 = await prisma.customer.create({
+    data: { storeId: ulan.id, name: "Андрей М.", phone: "+7 914 000 11 22" },
+  });
+  await prisma.customer.create({
+    data: { storeId: ulan.id, name: "Саяна Д.", phone: "+7 902 111 22 33" },
+  });
+  await prisma.customer.create({
+    data: { storeId: irkutsk.id, name: "Игорь К.", phone: "+7 395 200 00 01" },
+  });
+  await prisma.sale.create({
+    data: {
+      storeId: ulan.id,
+      customerId: c1.id,
+      sellerUserId: ulanManager.id,
+      amount: 3000,
+      number: "S000001",
+      note: "СЗУ 20W",
+      soldAt: daysAgo(1),
+      lines: {
+        create: [{ productId: charger.id, name: charger.name, qty: 1, unitPrice: 3000, lineTotal: 3000, warrantyDays: 90 }],
+      },
+    },
+  });
+  await prisma.sale.create({
+    data: {
+      storeId: irkutsk.id,
+      amount: 18900,
+      number: "S000002",
+      note: "AirPods Pro 2",
+      soldAt: daysAgo(3),
+      lines: {
+        create: [{ productId: airpods.id, name: airpods.name, qty: 1, unitPrice: 18900, lineTotal: 18900, warrantyDays: 365 }],
+      },
+    },
   });
 
   // Демо-партнёр в запуске
@@ -165,8 +346,9 @@ async function main() {
     data: { userId: founder.id, title: "Добро пожаловать в re:bar OS", body: "База знаний импортирована, партнёр Чита в запуске.", href: "/kb" },
   });
 
-  console.log("Seeded re:bar OS");
+  console.log("Seeded re:bar OS (franchise + retail)");
   console.log(`  founder  damdikdamdin@gmail.com / ${password}`);
+  console.log(`  products ${iphone.code}, ${airpods.code}, ${charger.code}, ${caseProd.code}`);
   console.log(`  project  ${project.id}`);
 }
 

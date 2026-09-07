@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/session";
 import { upsertProduct } from "@/actions/retail";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/fields";
+import { PrintActions } from "@/components/print/print-actions";
 
 export default async function ProductEditPage({ params }: { params: Promise<{ id: string }> }) {
   await requireUser();
@@ -24,7 +25,23 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
         <Link href="/catalog/products" className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
           ← Товары
         </Link>
-        <h1 className="mt-2 font-serif text-4xl italic">{isNew ? "Новый товар" : product!.name}</h1>
+        <h1 className="mt-2 font-serif text-4xl">{isNew ? "Новый товар" : product!.name}</h1>
+        {!isNew && product ? (
+          <div className="mt-3">
+            <PrintActions
+              label="Печать"
+              actions={[
+                { key: "big", label: "Большой ценник", href: `/print/price_big?product=${product.id}` },
+                { key: "small", label: "Маленький ценник", href: `/print/price_small?product=${product.id}` },
+                { key: "label", label: "Этикетка 43×25", href: `/print/label_43x25?product=${product.id}` },
+                { key: "imei", label: "Этикетка IMEI", href: `/print/label_imei?product=${product.id}` },
+              ]}
+            />
+            {product.barcode ? (
+              <p className="mt-2 font-mono text-[10px] text-muted-foreground">Штрихкод: {product.barcode}</p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <form action={upsertProduct} className="space-y-4 border border-border bg-card p-5">

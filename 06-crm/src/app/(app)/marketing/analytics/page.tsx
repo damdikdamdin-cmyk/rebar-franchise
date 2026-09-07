@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Card, Stat } from "@/components/ui/fields";
 import { LeadsChart } from "@/components/marketing/leads-chart";
-import { LEAD_STAGE_LABEL } from "@/lib/format";
+import { LEAD_STAGE_LABEL, rub } from "@/lib/format";
 
 function emptyWeeks(now: number) {
   const weeks: Record<string, { week: string; leads: number; qualified: number }> = {};
@@ -15,12 +16,21 @@ function emptyWeeks(now: number) {
 async function loadAnalytics() {
   const now = Date.now();
   const since = new Date(now - 56 * 86400000);
-  const leads = await prisma.lead.findMany({ where: { createdAt: { gte: since } }, select: { createdAt: true, source: true, stage: true, utmSource: true } });
-  return { leads, weeks: emptyWeeks(now) };
+  const [leads, sales] = await Promise.all([
+    prisma.lead.findMany({
+      where: { createdAt: { gte: since } },
+      select: { createdAt: true, source: true, stage: true, utmSource: true },
+    }),
+    prisma.sale.findMany({
+      where: { soldAt: { gte: since } },
+      select: { amount: true, creditAmount: true, soldAt: true, storeId: true, store: { select: { city: true, name: true } } },
+    }),
+  ]);
+  return { leads, sales, weeks: emptyWeeks(now) };
 }
 
 export default async function AnalyticsPage() {
-  const { leads, weeks } = await loadAnalytics();
+  const { leads, sales, weeks } = await loadAnalytics();
   for (const l of leads) {
     const k = weekKey(l.createdAt);
     if (!weeks[k]) continue;
@@ -41,22 +51,44 @@ export default async function AnalyticsPage() {
     }, {}),
   );
   const paid = leads.filter((l) => l.stage === "paid").length;
+  const retailRevenue = sales.reduce((s, x) => s + x.amount, 0);
+  const lendo = sales.reduce((s, x) => s + x.creditAmount, 0);
+  const byStore = Object.entries(
+    sales.reduce<Record<string, { label: string; amount: number }>>((acc, s) => {
+      const key = s.storeId;
+      const label = `${s.store.city} · ${s.store.name}`;
+      acc[key] = acc[key] ?? { label, amount: 0 };
+      acc[key].amount += s.amount;
+      return acc;
+    }, {}),
+  )
+    .map(([, v]) => v)
+    .sort((a, b) => b.amount - a.amount);
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Заявок за 8 недель" value={leads.length} />
         <Stat label="Квалифицировано" value={leads.filter((l) => !["new", "contacted", "lost"].includes(l.stage)).length} />
-        <Stat label="Оплат" value={paid} />
+        <Stat label="Оплат франшизы" value={paid} />
         <Stat label="Конверсия в оплату" value={leads.length ? `${Math.round((paid / leads.length) * 100)}%` : "—"} />
+        <Stat label="Выручка розницы · 8 нед" value={rub(retailRevenue)} hint={`${sales.length} чеков`} />
+        <Stat label="Lendo в рознице" value={rub(lendo)} hint={retailRevenue ? `${Math.round((lendo / retailRevenue) * 100)}%` : undefined} />
       </div>
+
       <Card className="px-5 py-5">
-        <p className="eyebrow mb-3">Заявки по неделям</p>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="eyebrow">Заявки по неделям</p>
+          <Link href="/network" className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground underline">
+            Сводка сети →
+          </Link>
+        </div>
         <LeadsChart data={Object.values(weeks)} />
       </Card>
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="px-5 py-5">
-          <p className="eyebrow mb-3">По источникам</p>
+          <p className="eyebrow mb-3">По источникам заявок</p>
           <ul className="space-y-2">
             {bySource.map(([s, n]) => (
               <li key={s} className="flex items-center gap-3 text-sm">
@@ -84,6 +116,26 @@ export default async function AnalyticsPage() {
           </ul>
         </Card>
       </div>
+
+      {byStore.length > 0 ? (
+        <Card className="px-5 py-5">
+          <p className="eyebrow mb-3">Розница по точкам · 8 недель</p>
+          <ul className="space-y-2">
+            {byStore.map((s) => (
+              <li key={s.label} className="flex items-center gap-3 text-sm">
+                <span className="min-w-0 flex-1 truncate">{s.label}</span>
+                <div className="h-2 w-40 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-foreground"
+                    style={{ width: `${(s.amount / Math.max(1, retailRevenue)) * 100}%` }}
+                  />
+                </div>
+                <span className="w-24 text-right font-mono text-xs">{rub(s.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
     </div>
   );
 }

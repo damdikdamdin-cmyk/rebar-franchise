@@ -23,16 +23,32 @@ export function navFor(role: Role): NavItem[] {
   if (canAccessLaunches(role)) items.push({ href: "/launches", label: "Запуски", icon: "rocket", group: "Работа" });
   items.push({ href: "/tasks", label: "Задачи", icon: "check", group: "Работа" });
   if (canAccessMarketing(role)) items.push({ href: "/marketing", label: "Маркетинг", icon: "megaphone", group: "Работа" });
-  if (STORE_ROLES.includes(role)) items.push({ href: "/day", label: "Рабочий день", icon: "sun", group: "Работа" });
+  if (STORE_ROLES.includes(role) || role === "partner") {
+    items.push({ href: "/day", label: "Рабочий день", icon: "sun", group: "Работа" });
+  }
 
   items.push({ href: "/kb", label: "База знаний", icon: "book", group: "Знания" });
   items.push({ href: "/learn", label: "Обучение", icon: "graduation", group: "Знания" });
+  if (isUk(role) || role === "partner") {
+    items.push({ href: "/learn/progress", label: "Прогресс обучения", icon: "chart", group: "Знания" });
+  }
 
   if (isUk(role)) items.push({ href: "/network", label: "Сводка сети", icon: "chart", group: "Сеть" });
   if (isUk(role)) items.push({ href: "/partners", label: "Партнёры", icon: "users", group: "Сеть" });
   items.push({ href: "/stores", label: "Точки", icon: "store", group: "Сеть" });
+
+  if (isUk(role) || role === "partner" || STORE_ROLES.includes(role)) {
+    items.push({ href: "/catalog/products", label: "Каталог", icon: "box", group: "Сеть" });
+  }
   if (canManageTeam(role) || role === "partner" || role === "uk_curator")
     items.push({ href: "/team", label: "Команда", icon: "team", group: "Настройки" });
+  if (isUk(role) || role === "partner" || STORE_ROLES.includes(role)) {
+    items.push({ href: "/settings/print-forms", label: "Печатные формы", icon: "print", group: "Настройки" });
+    items.push({ href: "/settings/devices", label: "Устройства", icon: "device", group: "Настройки" });
+  }
+  if (canManageTeam(role)) {
+    items.push({ href: "/settings/import", label: "Импорт", icon: "upload", group: "Настройки" });
+  }
 
   return items;
 }

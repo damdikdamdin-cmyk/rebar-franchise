@@ -11,9 +11,13 @@ import {
   Home,
   LogOut,
   Megaphone,
+  Package,
+  Printer,
   Rocket,
+  ScanBarcode,
   Store,
   Sun,
+  Upload,
   Users,
   UserCog,
   type LucideIcon,
@@ -22,6 +26,7 @@ import type { NavItem } from "@/lib/nav";
 import { logoutAction } from "@/actions/auth";
 import { ModeToggle } from "@/components/mode-toggle";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/brand-mark";
 
 const ICONS: Record<string, LucideIcon> = {
   home: Home,
@@ -36,6 +41,10 @@ const ICONS: Record<string, LucideIcon> = {
   users: Users,
   store: Store,
   team: UserCog,
+  box: Package,
+  print: Printer,
+  device: ScanBarcode,
+  upload: Upload,
 };
 
 export function Rail({
@@ -53,7 +62,7 @@ export function Rail({
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground lg:flex">
         <div className="px-5 pb-4 pt-5">
           <Link href="/" className="display block text-2xl">
-            re:bar <span className="font-mono text-[10px] not-italic tracking-[0.2em] text-sidebar-muted">OS</span>
+            <BrandMark /> <span className="font-mono text-[10px] not-italic tracking-[0.2em] text-sidebar-muted">OS</span>
           </Link>
           <p className="mt-2 truncate font-mono text-[10px] uppercase tracking-[0.14em] text-sidebar-muted">
             {user.context}

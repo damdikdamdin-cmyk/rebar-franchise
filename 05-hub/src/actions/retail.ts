@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/session";
 import { assertStoreAccess, isUk } from "@/lib/access";
 import { applyBalance, lineTotal, nextDocNumber, nextOrderNumber, nextSaleNumber, postStockDocument } from "@/lib/stock";
 import { ensureStoreCash, postCashTxn } from "@/lib/cash";
+import { nextProductBarcode } from "@/lib/barcode";
 
 async function loadStore(storeId: string) {
   const user = await requireUser();
@@ -61,6 +62,8 @@ export async function upsertProduct(formData: FormData) {
   if (!data.code || !data.name) return;
   if (data.groupId === "__none__") data.groupId = null;
   if (data.supplierId === "__none__") data.supplierId = null;
+
+  if (!data.barcode) data.barcode = await nextProductBarcode(prisma, data.code);
 
   if (id) {
     await prisma.product.update({ where: { id }, data });
@@ -136,6 +139,14 @@ export async function completeSale(formData: FormData) {
   );
 
   const number = await nextSaleNumber();
+  const warrantyByProduct = new Map(
+    (
+      await prisma.product.findMany({
+        where: { id: { in: computed.map((l) => l.productId) } },
+        select: { id: true, warrantyDays: true },
+      })
+    ).map((p) => [p.id, p.warrantyDays]),
+  );
   const sale = await prisma.$transaction(async (tx) => {
     for (const line of computed) {
       await applyBalance(tx, storeId, line.productId, -line.qty);
@@ -166,6 +177,7 @@ export async function completeSale(formData: FormData) {
             discountValue: line.discountValue,
             lineTotal: line.lineTotal,
             serial: line.serial || null,
+            warrantyDays: warrantyByProduct.get(line.productId) ?? null,
           })),
         },
       },
@@ -462,6 +474,7 @@ export async function importProductsCsv(formData: FormData) {
       create: {
         code,
         name,
+        barcode: cols[idx("barcode")]?.trim() || (await nextProductBarcode(prisma, code)),
         retailPrice: Number(cols[idx("retail")] ?? 0) || 0,
         purchasePrice: Number(cols[idx("purchase")] ?? 0) || 0,
         serialTracked: (cols[idx("serial")] ?? "").trim() === "1",

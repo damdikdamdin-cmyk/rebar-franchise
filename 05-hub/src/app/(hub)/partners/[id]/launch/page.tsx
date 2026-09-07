@@ -37,7 +37,7 @@ export default async function LaunchPage({ params }: { params: Promise<{ id: str
         <Link href={`/partners/${partner.id}`} className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
           ← {partner.name}
         </Link>
-        <h1 className="mt-2 font-serif text-4xl italic">Запуск {project.store.city}</h1>
+        <h1 className="mt-2 font-serif text-4xl">Запуск {project.store.city}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {LAUNCH_STATUS_LABEL[project.status]} · {done}/{project.tasks.length} шагов
           {project.targetOpenAt ? ` · план ${shortDate(project.targetOpenAt)}` : ""}

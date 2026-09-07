@@ -1,7 +1,17 @@
 import type { NextAuthConfig } from "next-auth";
 import type { Role } from "@prisma/client";
 
-export const PUBLIC_PREFIXES = ["/login", "/join", "/apply", "/reset", "/api/leads", "/api/auth", "/kb-files"];
+export const PUBLIC_PREFIXES = [
+  "/login",
+  "/join",
+  "/apply",
+  "/reset",
+  "/api/leads",
+  "/api/auth",
+  "/kb-files",
+  "/print",
+  "/fonts",
+];
 
 export const authConfig = {
   trustHost: true,

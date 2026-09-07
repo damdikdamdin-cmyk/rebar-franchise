@@ -1,3 +1,4 @@
+import { BrandMark } from "@/components/brand-mark";
 import type { ReactNode } from "react";
 
 export default function PublicLayout({ children }: { children: ReactNode }) {
@@ -5,7 +6,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
       <aside className="relative hidden flex-col justify-between overflow-hidden bg-sidebar p-10 text-sidebar-foreground lg:flex">
         <div className="relative z-10 flex items-center justify-between">
-          <span className="display text-3xl">re:bar</span>
+          <BrandMark className="display text-3xl" />
           <span className="eyebrow text-sidebar-muted">OS · закрытая сеть</span>
         </div>
         <div className="relative z-10 max-w-md">

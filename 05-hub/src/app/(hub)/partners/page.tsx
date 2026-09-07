@@ -24,7 +24,7 @@ export default async function PartnersPage() {
     <div className="space-y-6">
       <header>
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Партнёрская программа</p>
-        <h1 className="mt-1 font-serif text-4xl italic">Партнёры</h1>
+        <h1 className="mt-1 font-serif text-4xl">Партнёры</h1>
       </header>
       <ul className="divide-y divide-border border border-border bg-card">
         {partners.map((partner) => {
