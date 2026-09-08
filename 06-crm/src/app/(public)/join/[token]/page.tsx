@@ -51,7 +51,7 @@ export default async function JoinPage({
           <Input value={invite.email} disabled />
         </Field>
         <Field label="Имя и фамилия">
-          <Input name="name" required autoComplete="name" />
+          <Input name="name" required autoComplete="name" defaultValue={invite.nameHint ?? ""} />
         </Field>
         <Field label="Телефон">
           <Input name="phone" type="tel" autoComplete="tel" />

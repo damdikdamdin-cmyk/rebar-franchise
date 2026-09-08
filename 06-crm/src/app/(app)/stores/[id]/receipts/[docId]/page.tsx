@@ -67,7 +67,7 @@ export default async function ReceiptDetailPage({
         <div className="flex flex-wrap gap-2">
           <ExcelExportButton
             filename={`${doc.number}.csv`}
-            headers={["Код", "Товар", "IMEI", "Кол-во", "Закуп", "Сумма закупа", "Розница", "Маржа шт."]}
+            headers={["Код", "Товар", "IMEI", "Кол-во", "Закуп", "Сумма закупа", "Розница", "Валовая прибыль шт."]}
             rows={exportRows}
           />
           <PrintActions
@@ -127,7 +127,7 @@ export default async function ReceiptDetailPage({
               <th className="px-3 py-2">Закуп. цена</th>
               <th className="px-3 py-2">Сумма закупа</th>
               <th className="px-3 py-2">Розничная</th>
-              <th className="px-3 py-2">Маржа</th>
+              <th className="px-3 py-2">Валовая прибыль</th>
             </tr>
           </thead>
           <tbody>
@@ -154,7 +154,7 @@ export default async function ReceiptDetailPage({
             Итого: {qtyTotal} шт.
           </span>
           <span>
-            закуп {rub(purchaseTotal)} · розница {rub(retailTotal)} · прибыль {rub(retailTotal - purchaseTotal)}
+            закуп {rub(purchaseTotal)} · розница {rub(retailTotal)} · валовая прибыль {rub(retailTotal - purchaseTotal)}
           </span>
         </div>
       </section>

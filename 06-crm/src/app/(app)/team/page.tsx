@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/session";
 import { ALL_ROLES, canManageTeam, isUk, ROLE_LABEL, STORE_ROLES, UK_ROLES } from "@/lib/access";
-import { createInvite, revokeInvite, updateMemberRole } from "@/actions/team";
+import { createInvite, revokeInvite, updateMemberRole, assignAccessRole } from "@/actions/team";
+import { ensureSystemAccessRoles } from "@/lib/access-roles";
 import { Button } from "@/components/ui/button";
 import { Avatar, Badge, Card, Empty, Field, Input, PageHeader, Select } from "@/components/ui/fields";
 import { CopyButton } from "@/components/copy-button";
@@ -12,20 +14,46 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const user = await requireUser();
   const sp = await searchParams;
   const admin = canManageTeam(user.role);
-  if (!admin && user.role !== "partner" && user.role !== "uk_curator") redirect("/");
+  const canSee =
+    admin || user.role === "partner" || user.role === "uk_curator" || user.role === "store_manager";
+  if (!canSee) redirect("/");
+
+  await ensureSystemAccessRoles();
 
   const partnerScope = user.role === "partner" ? { partnerId: user.partnerId } : {};
   const curatorScope = user.role === "uk_curator" ? { partner: { curatorUserId: user.id } } : {};
+  const storeMgrScope = user.role === "store_manager" ? { storeId: user.storeId } : {};
 
-  const [members, invites, partners, stores] = await Promise.all([
+  const [members, invites, partners, stores, accessRoles] = await Promise.all([
     prisma.user.findMany({
-      where: admin ? {} : user.role === "partner" ? { partnerId: user.partnerId } : { OR: [{ partner: { curatorUserId: user.id } }, { id: user.id }] },
-      include: { partner: true, store: true, enrollments: { include: { course: { include: { lessons: true } }, progress: true } } },
+      where: admin
+        ? {}
+        : user.role === "partner"
+          ? { partnerId: user.partnerId }
+          : user.role === "store_manager"
+            ? { storeId: user.storeId }
+            : { OR: [{ partner: { curatorUserId: user.id } }, { id: user.id }] },
+      include: {
+        partner: true,
+        store: true,
+        accessRole: true,
+        enrollments: { include: { course: { include: { lessons: true } }, progress: true } },
+      },
       orderBy: [{ role: "asc" }, { name: "asc" }],
     }),
     prisma.invite.findMany({
-      where: { usedAt: null, expiresAt: { gt: new Date() }, ...(admin ? {} : user.role === "partner" ? partnerScope : curatorScope) },
-      include: { partner: true, store: true },
+      where: {
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+        ...(admin
+          ? {}
+          : user.role === "partner"
+            ? partnerScope
+            : user.role === "store_manager"
+              ? storeMgrScope
+              : curatorScope),
+      },
+      include: { partner: true, store: true, accessRole: true },
       orderBy: { createdAt: "desc" },
     }),
     admin
@@ -34,12 +62,31 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         ? prisma.partner.findMany({ where: { curatorUserId: user.id }, orderBy: { name: "asc" } })
         : [],
     prisma.store.findMany({
-      where: admin ? {} : user.role === "partner" ? { partnerId: user.partnerId } : { partner: { curatorUserId: user.id } },
+      where: admin
+        ? {}
+        : user.role === "partner"
+          ? { partnerId: user.partnerId }
+          : user.role === "store_manager"
+            ? { id: user.storeId ?? "__none__" }
+            : { partner: { curatorUserId: user.id } },
       orderBy: [{ city: "asc" }, { name: "asc" }],
+    }),
+    prisma.accessRole.findMany({
+      where:
+        user.role === "store_manager"
+          ? { OR: [{ system: true, storeId: null }, { storeId: user.storeId }] }
+          : {},
+      orderBy: [{ system: "desc" }, { name: "asc" }],
     }),
   ]);
 
-  const roleOptions = admin ? ALL_ROLES : user.role === "partner" ? (["store_manager", "seller"] as const) : (["partner", "store_manager", "seller"] as const);
+  const roleOptions = admin
+    ? ALL_ROLES
+    : user.role === "partner"
+      ? (["store_manager", "seller"] as const)
+      : user.role === "store_manager"
+        ? (["seller", "store_manager"] as const)
+        : (["partner", "store_manager", "seller"] as const);
   const appUrl = process.env.APP_URL ?? "http://localhost:3100";
 
   return (
@@ -51,6 +98,14 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           admin
             ? "Приглашения в УК, партнёрам и сотрудникам точек. Ссылка живёт 14 дней."
             : "Приглашайте сотрудников своих точек. Ссылку отправьте лично — почта не используется."
+        }
+        actions={
+          <Link
+            href="/team/roles"
+            className="border border-border px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em]"
+          >
+            Роли и права
+          </Link>
         }
       />
 
@@ -94,6 +149,25 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                     ) : (
                       <Badge tone="steel">{ROLE_LABEL[m.role]}</Badge>
                     )}
+                    {STORE_ROLES.includes(m.role) || m.role === "partner" ? (
+                      <form action={assignAccessRole} className="flex items-center gap-1">
+                        <input type="hidden" name="id" value={m.id} />
+                        <Select name="accessRoleId" defaultValue={m.accessRoleId ?? ""} className="h-7 w-48 text-xs">
+                          <option value="">права по роли</option>
+                          {accessRoles.map((ar) => (
+                            <option key={ar.id} value={ar.id}>
+                              {ar.name}
+                              {ar.system ? " · пресет" : ""}
+                            </option>
+                          ))}
+                        </Select>
+                        <Button type="submit" size="xs" variant="outline">
+                          Права
+                        </Button>
+                      </form>
+                    ) : m.accessRole ? (
+                      <Badge tone="steel">{m.accessRole.name}</Badge>
+                    ) : null}
                     <span className="hidden font-mono text-[10px] text-muted-foreground sm:inline">
                       {m.lastSeenAt ? `был ${dateTime(m.lastSeenAt)}` : "не входил"}
                     </span>
@@ -137,6 +211,9 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           <p className="eyebrow">Новое приглашение</p>
           {sp.error ? <p className="mt-2 text-xs text-destructive">Нет прав на такое приглашение.</p> : null}
           <form action={createInvite} className="mt-4 space-y-3">
+            <Field label="Имя">
+              <Input name="name" placeholder="Как в чеках и документах" />
+            </Field>
             <Field label="Email">
               <Input name="email" type="email" required />
             </Field>
@@ -149,6 +226,18 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                 ))}
               </Select>
             </Field>
+            {accessRoles.length ? (
+              <Field label="Шаблон прав" hint="Галочки продаж / склада / кассы">
+                <Select name="accessRoleId" defaultValue={accessRoles.find((a) => a.name === "Продавец")?.id ?? ""}>
+                  <option value="">— по системной роли —</option>
+                  {accessRoles.map((ar) => (
+                    <option key={ar.id} value={ar.id}>
+                      {ar.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            ) : null}
             {partners.length ? (
               <Field label="Партнёр" hint="Для роли партнёра и его сотрудников">
                 <Select name="partnerId" defaultValue="">

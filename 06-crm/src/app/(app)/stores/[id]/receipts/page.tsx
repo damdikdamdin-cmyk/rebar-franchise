@@ -20,13 +20,14 @@ export default async function ReceiptsPage({
   const needle = (q ?? "").trim().toLowerCase();
 
   const productsRaw = await prisma.product.findMany({
-    where: { active: true },
+    where: { active: true, deletedAt: null },
     include: { balances: { where: { storeId: id } } },
     orderBy: { name: "asc" },
   });
   const products = productsRaw.map((p) => ({
     id: p.id,
     code: p.code,
+    barcode: p.barcode,
     name: p.name,
     purchasePrice: p.purchasePrice,
     retailPrice: p.retailPrice,
@@ -63,6 +64,7 @@ export default async function ReceiptsPage({
   const exportRows = filtered.map((d) => [
     d.number,
     dateTime(d.createdAt),
+    d.user?.name ?? "",
     d.supplier?.name ?? "",
     d.totalAmount,
     d.paidAmount,
@@ -95,7 +97,7 @@ export default async function ReceiptsPage({
             </form>
             <ExcelExportButton
               filename={`receipts-${id}.csv`}
-              headers={["Документ", "Дата", "Поставщик", "Сумма", "Оплачено", "Статус", "Комментарий", "Вход.№"]}
+              headers={["Документ", "Дата", "Ответственный", "Поставщик", "Сумма", "Оплачено", "Статус", "Комментарий", "Вход.№"]}
               rows={exportRows}
             />
           </div>
@@ -107,6 +109,7 @@ export default async function ReceiptsPage({
               <tr className="border-b border-border text-left">
                 <th className="px-4 py-3">Документ</th>
                 <th className="px-4 py-3">Дата</th>
+                <th className="px-4 py-3">Ответственный</th>
                 <th className="px-4 py-3">Поставщик</th>
                 <th className="px-4 py-3">Сумма закупа</th>
                 <th className="px-4 py-3">Оплачено</th>
@@ -118,7 +121,7 @@ export default async function ReceiptsPage({
             <tbody>
               {!filtered.length ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-6 text-muted-foreground">
+                  <td colSpan={9} className="px-4 py-6 text-muted-foreground">
                     Поступлений нет
                   </td>
                 </tr>
@@ -133,6 +136,7 @@ export default async function ReceiptsPage({
                       </Link>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs">{dateTime(d.createdAt)}</td>
+                    <td className="px-4 py-3">{d.user?.name ?? "—"}</td>
                     <td className="px-4 py-3">{d.supplier?.name ?? "—"}</td>
                     <td className="px-4 py-3 font-mono">
                       {rub(d.totalAmount)}

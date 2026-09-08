@@ -18,6 +18,8 @@ const MODULES = [
   { href: "/transactions", label: "Транзакции" },
   { href: "/cashflow", label: "Денежный поток" },
   { href: "/payroll", label: "Зарплата" },
+  { href: "/schedule", label: "График" },
+  { href: "/audit", label: "История" },
   { href: "/warranty", label: "Гарантии" },
   { href: "/reports", label: "Отчёты" },
 ] as const;

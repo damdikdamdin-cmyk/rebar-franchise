@@ -96,7 +96,7 @@ export default async function SalesHistoryPage({
             </span>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Поиск по IMEI (в т.ч. старому), номеру чека, клиенту. Удалённые чеки не исчезают — помечаются красным ×.
+            Поиск по IMEI, номеру чека, клиенту. Удалённые — галка «Удалённые».
           </p>
         </div>
       </div>
@@ -148,7 +148,7 @@ export default async function SalesHistoryPage({
                     ) : null}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {dateTime(s.soldAt)} · {s.seller?.name ?? "—"} · {s.customer?.name ?? "розница"}
+                    {dateTime(s.soldAt)} · продавец {s.seller?.name ?? "—"} · {s.customer?.name ?? "розница"}
                   </p>
                   <p className={`mt-1 text-xs ${s.deletedAt ? "line-through text-muted-foreground" : ""}`}>
                     {(s.deletedAt ? s.lines : activeLines)

@@ -33,6 +33,7 @@ export function DocTable({
             <tr className="border-b border-border text-left">
               <th className="px-4 py-3">Документ</th>
               <th className="px-4 py-3">Дата</th>
+              <th className="px-4 py-3">Ответственный</th>
               <th className="px-4 py-3">Поставщик</th>
               <th className="px-4 py-3">Сумма</th>
               <th className="px-4 py-3">Оплачено</th>
@@ -46,6 +47,7 @@ export function DocTable({
               <tr key={d.id} className="border-b border-border last:border-0">
                 <td className="px-4 py-3 font-mono">{d.number}</td>
                 <td className="px-4 py-3 font-mono text-xs">{dateTime(d.createdAt)}</td>
+                <td className="px-4 py-3">{d.user?.name ?? "—"}</td>
                 <td className="px-4 py-3">{d.supplier?.name ?? "—"}</td>
                 <td className="px-4 py-3 font-mono">{rub(d.totalAmount)}</td>
                 <td className="px-4 py-3 font-mono">{rub(d.paidAmount)}</td>

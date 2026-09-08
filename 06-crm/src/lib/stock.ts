@@ -143,6 +143,12 @@ export async function postStockDocument(documentId: string, actorUserId?: string
         case "inventory": {
           const delta = line.qtyActual - line.qtyAccount;
           if (delta !== 0) await applyBalance(tx, doc.storeId, line.productId, delta);
+          if (line.serial && line.qtyActual <= 0 && line.qtyAccount > 0) {
+            await tx.productSerial.updateMany({
+              where: { productId: line.productId, serial: line.serial, storeId: doc.storeId },
+              data: { status: "written_off" },
+            });
+          }
           break;
         }
         default:

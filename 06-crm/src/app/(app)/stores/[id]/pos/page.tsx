@@ -19,7 +19,7 @@ export default async function PosPage({
     }),
     prisma.productSerial.findMany({
       where: { storeId: id, status: "in_stock" },
-      select: { id: true, productId: true, serial: true },
+      select: { id: true, productId: true, serial: true, retailPrice: true },
       orderBy: { createdAt: "desc" },
       take: 5000,
     }),

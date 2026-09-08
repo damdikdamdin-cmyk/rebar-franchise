@@ -121,35 +121,75 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
           </div>
           <div>
             <Label htmlFor="purchasePrice">Закуп. цена</Label>
-            <Input id="purchasePrice" name="purchasePrice" type="number" defaultValue={product?.purchasePrice ?? 0} />
+            <Input
+              id="purchasePrice"
+              name="purchasePrice"
+              inputMode="numeric"
+              defaultValue={product?.purchasePrice ? String(product.purchasePrice) : ""}
+            />
           </div>
           <div>
             <Label htmlFor="retailPrice">Розничная</Label>
-            <Input id="retailPrice" name="retailPrice" type="number" defaultValue={product?.retailPrice ?? 0} />
+            <Input
+              id="retailPrice"
+              name="retailPrice"
+              inputMode="numeric"
+              defaultValue={product?.retailPrice ? String(product.retailPrice) : ""}
+            />
           </div>
           <div>
             <Label htmlFor="repairPrice">Ремонтная</Label>
-            <Input id="repairPrice" name="repairPrice" type="number" defaultValue={product?.repairPrice ?? 0} />
+            <Input
+              id="repairPrice"
+              name="repairPrice"
+              inputMode="numeric"
+              defaultValue={product?.repairPrice ? String(product.repairPrice) : ""}
+            />
           </div>
           <div>
             <Label htmlFor="preorderPrice">Под заказ</Label>
-            <Input id="preorderPrice" name="preorderPrice" type="number" defaultValue={product?.preorderPrice ?? 0} />
+            <Input
+              id="preorderPrice"
+              name="preorderPrice"
+              inputMode="numeric"
+              defaultValue={product?.preorderPrice ? String(product.preorderPrice) : ""}
+            />
           </div>
           <div>
             <Label htmlFor="warrantyDays">Гарантия, дней</Label>
-            <Input id="warrantyDays" name="warrantyDays" type="number" defaultValue={product?.warrantyDays ?? 365} />
+            <Input
+              id="warrantyDays"
+              name="warrantyDays"
+              inputMode="numeric"
+              defaultValue={product?.warrantyDays != null ? String(product.warrantyDays) : "365"}
+            />
           </div>
           <div>
             <Label htmlFor="minStock">Мин. остаток</Label>
-            <Input id="minStock" name="minStock" type="number" defaultValue={product?.minStock ?? 0} />
+            <Input
+              id="minStock"
+              name="minStock"
+              inputMode="numeric"
+              defaultValue={product?.minStock ? String(product.minStock) : ""}
+            />
           </div>
           <div>
             <Label htmlFor="commissionPct">Комиссия %</Label>
-            <Input id="commissionPct" name="commissionPct" type="number" defaultValue={product?.commissionPct ?? 0} />
+            <Input
+              id="commissionPct"
+              name="commissionPct"
+              inputMode="numeric"
+              defaultValue={product?.commissionPct ? String(product.commissionPct) : ""}
+            />
           </div>
           <div>
             <Label htmlFor="commissionRub">Комиссия ₽</Label>
-            <Input id="commissionRub" name="commissionRub" type="number" defaultValue={product?.commissionRub ?? 0} />
+            <Input
+              id="commissionRub"
+              name="commissionRub"
+              inputMode="numeric"
+              defaultValue={product?.commissionRub ? String(product.commissionRub) : ""}
+            />
           </div>
         </div>
         <SerialTrackedFields
@@ -173,10 +213,6 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
           <h2 className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-red-600">
             Удалить номенклатуру
           </h2>
-          <p className="mb-3 text-xs text-muted-foreground">
-            Товар не уничтожается: помечается удалённым (красный ×), скрывается с остатков и из кассы, остаётся в
-            истории.
-          </p>
           <form action={softDeleteProduct}>
             <input type="hidden" name="productId" value={product.id} />
             <button

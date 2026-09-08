@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 type ProductOpt = {
   id: string;
   code: string;
+  barcode?: string | null;
   name: string;
   purchasePrice: number;
   retailPrice: number;
@@ -21,6 +22,7 @@ type ProductOpt = {
 type Line = {
   productId: string | null;
   code: string;
+  barcode: string;
   name: string;
   qty: number;
   price: number;
@@ -30,6 +32,13 @@ type Line = {
   serialTracked?: boolean;
   isNew?: boolean;
 };
+
+function parseMoney(raw: string) {
+  const cleaned = raw.replace(/\s/g, "").replace(",", ".").trim();
+  if (!cleaned) return "";
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? String(Math.max(0, Math.trunc(n))) : "";
+}
 
 export function ReceiptCreateForm({
   storeId,
@@ -44,15 +53,16 @@ export function ReceiptCreateForm({
   const [productId, setProductId] = useState("");
   const [modelName, setModelName] = useState("");
   const [code, setCode] = useState("");
-  const [qty, setQty] = useState(1);
-  const [price, setPrice] = useState(0);
-  const [retailPrice, setRetailPrice] = useState(0);
-  const [warrantyDays, setWarrantyDays] = useState(365);
+  const [barcode, setBarcode] = useState("");
+  const [qtyText, setQtyText] = useState("1");
+  const [priceText, setPriceText] = useState("");
+  const [retailText, setRetailText] = useState("");
+  const [warrantyText, setWarrantyText] = useState("365");
   const [serial, setSerial] = useState("");
   const [serialTracked, setSerialTracked] = useState(true);
   const [lines, setLines] = useState<Line[]>([]);
+  const [triedAdd, setTriedAdd] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
-  const [hint, setHint] = useState<string | null>(null);
 
   const suggestions = useMemo(() => {
     const q = modelName.trim().toLowerCase();
@@ -61,20 +71,26 @@ export function ReceiptCreateForm({
       .filter(
         (p) =>
           p.name.toLowerCase().includes(q) ||
-          p.code.toLowerCase().includes(q),
+          p.code.toLowerCase().includes(q) ||
+          (p.barcode ?? "").toLowerCase().includes(q),
       )
       .slice(0, 8);
   }, [catalog, modelName]);
+
+  const nameInvalid = triedAdd && !modelName.trim();
+  const purchaseInvalid = triedAdd && !priceText.trim();
+  const retailInvalid = triedAdd && !retailText.trim();
+  const serialInvalid = triedAdd && serialTracked && !serial.trim();
 
   function pickProduct(p: ProductOpt) {
     setProductId(p.id);
     setModelName(p.name);
     setCode(p.code);
-    setPrice(p.purchasePrice);
-    setRetailPrice(p.retailPrice);
+    setBarcode(p.barcode ?? "");
+    setPriceText(p.purchasePrice ? String(p.purchasePrice) : "");
+    setRetailText(p.retailPrice ? String(p.retailPrice) : "");
     setSerialTracked(p.serialTracked);
-    setWarrantyDays(365);
-    setHint(`Из номенклатуры: ${p.name}`);
+    setWarrantyText("365");
   }
 
   function onModelChange(value: string) {
@@ -85,30 +101,31 @@ export function ReceiptCreateForm({
       return;
     }
     setProductId("");
-    setHint(
-      value.trim()
-        ? "Новая модель — при сохранении поступления попадёт в номенклатуру"
-        : null,
-    );
   }
 
   function addLine() {
+    setTriedAdd(true);
     const name = modelName.trim();
-    if (!name || qty <= 0) {
-      setHint("Введите название модели");
-      return;
-    }
+    const price = Number(priceText) || 0;
+    const retailPrice = Number(retailText) || 0;
+    const warrantyDays = Number(warrantyText);
+    const qty = Math.max(1, Number(qtyText) || 1);
+    if (!name || !priceText.trim() || !retailText.trim()) return;
+    if (serialTracked && !serial.trim()) return;
+
     const matched =
       catalog.find((p) => p.id === productId && !p.id.startsWith("tmp-")) ??
       catalog.find((p) => p.name.toLowerCase() === name.toLowerCase() && !p.id.startsWith("tmp-"));
+
     const line: Line = {
       productId: matched?.id ?? null,
       code: code.trim() || matched?.code || "новый",
+      barcode: barcode.trim() || matched?.barcode || "",
       name: matched?.name ?? name,
       qty: serialTracked || serial.trim() ? 1 : qty,
       price,
       retailPrice,
-      warrantyDays: Math.max(0, warrantyDays || 365),
+      warrantyDays: Number.isFinite(warrantyDays) && warrantyDays >= 0 ? warrantyDays : 365,
       serial: serial.trim() || undefined,
       serialTracked: serialTracked || Boolean(serial.trim()),
       isNew: !matched,
@@ -121,6 +138,7 @@ export function ReceiptCreateForm({
           {
             id: `tmp-${Date.now()}`,
             code: line.code === "новый" ? "" : line.code,
+            barcode: line.barcode || null,
             name,
             purchasePrice: price,
             retailPrice,
@@ -135,10 +153,12 @@ export function ReceiptCreateForm({
     setModelName("");
     setProductId("");
     setCode("");
-    setPrice(0);
-    setRetailPrice(0);
-    setWarrantyDays(365);
-    setHint("Строка добавлена. Новые модели сохранятся в каталог при создании поступления.");
+    setBarcode("");
+    setPriceText("");
+    setRetailText("");
+    setQtyText("1");
+    setWarrantyText("365");
+    setTriedAdd(false);
   }
 
   function onImportFile(file: File) {
@@ -153,16 +173,17 @@ export function ReceiptCreateForm({
       const header = table[0].map((h) => h.toLowerCase());
       const idx = (names: string[]) => names.map((n) => header.indexOf(n)).find((i) => i >= 0) ?? -1;
       const iCode = idx(["code", "код"]);
+      const iBarcode = idx(["barcode", "штрихкод", "штрих-код", "ean"]);
       const iName = idx(["name", "товар", "наименование", "товары", "модель"]);
       const iQty = idx(["qty", "кол-во", "количество", "кол"]);
       const iPurchase = idx(["purchase", "закуп", "закуп. цена", "себестоимость", "price"]);
       const iRetail = idx(["retail", "розница", "розничная"]);
       const iSerial = idx(["serial", "imei", "s/n", "sn"]);
+      const iWarranty = idx(["warranty", "гарантия", "гарантия дн", "гарантия, дн"]);
 
       const byCode = new Map(catalog.map((p) => [p.code.toLowerCase(), p]));
       const byName = new Map(catalog.map((p) => [p.name.toLowerCase(), p]));
       const next: Line[] = [];
-      let createdLocal = 0;
       for (const row of table.slice(1)) {
         const rowCode = iCode >= 0 ? row[iCode]?.trim() : "";
         const rowName = iName >= 0 ? row[iName]?.trim() : "";
@@ -174,24 +195,23 @@ export function ReceiptCreateForm({
         const purchase = Number(String(row[iPurchase] ?? "").replace(/\s/g, "")) || product?.purchasePrice || 0;
         const retail = Number(String(row[iRetail] ?? "").replace(/\s/g, "")) || product?.retailPrice || 0;
         const sn = iSerial >= 0 ? row[iSerial]?.trim() : "";
+        const w = iWarranty >= 0 ? Number(String(row[iWarranty] ?? "").replace(/\s/g, "")) : 365;
         next.push({
           productId: product?.id ?? null,
           code: rowCode || product?.code || "новый",
+          barcode: (iBarcode >= 0 ? row[iBarcode]?.trim() : "") || product?.barcode || "",
           name: rowName || product?.name || rowCode,
           qty: Math.max(1, Number(row[iQty] ?? 1) || 1),
           price: purchase,
           retailPrice: retail,
-          warrantyDays: 365,
+          warrantyDays: Number.isFinite(w) && w >= 0 ? w : 365,
           serial: sn || undefined,
           serialTracked: Boolean(sn) || product?.serialTracked,
           isNew: !product,
         });
-        if (!product) createdLocal++;
       }
       setLines((prev) => [...prev, ...next]);
-      setImportMsg(
-        `Загружено: ${next.length}${createdLocal ? ` · новых моделей (сохранятся в номенклатуру): ${createdLocal}` : ""}`,
-      );
+      setImportMsg(`Загружено: ${next.length}`);
     };
     reader.readAsText(file);
   }
@@ -218,20 +238,19 @@ export function ReceiptCreateForm({
           />
         </label>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Модель можно ввести вручную — при создании поступления она сохранится в номенклатуру и подставится в следующий раз.
-      </p>
       {importMsg ? <p className="text-xs text-muted-foreground">{importMsg}</p> : null}
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
-        <div className="lg:col-span-2">
-          <Label htmlFor="modelName">Модель / название</Label>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+        <div className="sm:col-span-2 xl:col-span-2">
+          <Label htmlFor="modelName" required invalid={nameInvalid}>
+            Модель / название
+          </Label>
           <Input
             id="modelName"
             list={listId}
             value={modelName}
+            invalid={nameInvalid}
             onChange={(e) => onModelChange(e.target.value)}
-            placeholder="Apple iPhone 16 Pro 256GB Black"
             autoComplete="off"
           />
           <datalist id={listId}>
@@ -258,44 +277,77 @@ export function ReceiptCreateForm({
           ) : null}
         </div>
         <div>
-          <Label>Код (опц.)</Label>
-          <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="авто" />
+          <Label>Код</Label>
+          <Input value={code} onChange={(e) => setCode(e.target.value)} />
+        </div>
+        <div>
+          <Label>Штрихкод</Label>
+          <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} className="font-mono" />
         </div>
         <div>
           <Label>Кол-во</Label>
-          <Input type="number" min={1} value={qty} onChange={(e) => setQty(Number(e.target.value) || 1)} />
+          <Input
+            inputMode="numeric"
+            value={qtyText}
+            onChange={(e) => setQtyText(e.target.value.replace(/[^\d]/g, ""))}
+          />
         </div>
         <div>
-          <Label>Закуп</Label>
-          <Input type="number" value={price || ""} onChange={(e) => setPrice(Number(e.target.value) || 0)} />
+          <Label required invalid={purchaseInvalid}>
+            Закуп
+          </Label>
+          <Input
+            inputMode="numeric"
+            value={priceText}
+            invalid={purchaseInvalid}
+            onChange={(e) => setPriceText(parseMoney(e.target.value))}
+          />
         </div>
         <div>
-          <Label>Розница</Label>
-          <Input type="number" value={retailPrice || ""} onChange={(e) => setRetailPrice(Number(e.target.value) || 0)} />
+          <Label required invalid={retailInvalid}>
+            Розница
+          </Label>
+          <Input
+            inputMode="numeric"
+            value={retailText}
+            invalid={retailInvalid}
+            onChange={(e) => setRetailText(parseMoney(e.target.value))}
+          />
         </div>
         <div>
           <Label>Гарантия, дн.</Label>
-          <Input type="number" min={0} value={warrantyDays} onChange={(e) => setWarrantyDays(Number(e.target.value) || 0)} />
+          <Input
+            inputMode="numeric"
+            value={warrantyText}
+            onChange={(e) => setWarrantyText(e.target.value.replace(/[^\d]/g, ""))}
+          />
         </div>
         <div>
-          <Label>IMEI / S/N</Label>
-          <Input value={serial} onChange={(e) => setSerial(e.target.value)} placeholder="350070402858053" />
+          <Label required={serialTracked} invalid={serialInvalid}>
+            IMEI / S/N
+          </Label>
+          <Input
+            value={serial}
+            invalid={serialInvalid}
+            onChange={(e) => setSerial(e.target.value)}
+            className="font-mono"
+          />
         </div>
       </div>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={serialTracked} onChange={(e) => setSerialTracked(e.target.checked)} />
         Серийный товар (IMEI / S/N)
       </label>
-      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       <Button type="button" variant="outline" size="sm" onClick={addLine}>
         + Добавить товар
       </Button>
 
       <div className="overflow-x-auto border border-border">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="w-full min-w-[860px] text-sm">
           <thead className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
             <tr className="border-b border-border text-left">
               <th className="px-3 py-2">Код</th>
+              <th className="px-3 py-2">Штрихкод</th>
               <th className="px-3 py-2">Товар</th>
               <th className="px-3 py-2">S/N</th>
               <th className="px-3 py-2">Кол-во</th>
@@ -307,21 +359,21 @@ export function ReceiptCreateForm({
           </thead>
           <tbody>
             {lines.map((l, i) => (
-              <tr key={`${l.name}-${i}`} className="border-b border-border">
+              <tr key={`${l.name}-${l.serial ?? i}-${i}`} className="border-b border-border">
                 <td className="px-3 py-2 font-mono text-xs">{l.code}</td>
-                <td className="px-3 py-2">
-                  {l.name}
-                  {l.isNew ? (
-                    <span className="ml-2 font-mono text-[10px] uppercase text-muted-foreground">новая</span>
-                  ) : null}
-                </td>
+                <td className="px-3 py-2 font-mono text-xs">{l.barcode || "—"}</td>
+                <td className="px-3 py-2">{l.name}</td>
                 <td className="px-3 py-2 font-mono text-xs">{l.serial ?? "—"}</td>
                 <td className="px-3 py-2 font-mono">{l.qty}</td>
                 <td className="px-3 py-2 font-mono">{rub(l.price)}</td>
                 <td className="px-3 py-2 font-mono">{rub(l.retailPrice)}</td>
                 <td className="px-3 py-2 font-mono">{l.warrantyDays} дн.</td>
                 <td className="px-3 py-2">
-                  <button type="button" className="font-mono text-[10px]" onClick={() => setLines((prev) => prev.filter((_, idx) => idx !== i))}>
+                  <button
+                    type="button"
+                    className="font-mono text-[10px]"
+                    onClick={() => setLines((prev) => prev.filter((_, idx) => idx !== i))}
+                  >
                     удалить
                   </button>
                 </td>
@@ -331,8 +383,8 @@ export function ReceiptCreateForm({
         </table>
       </div>
       <p className="font-mono text-xs text-muted-foreground">
-        Итого: {lines.reduce((s, l) => s + l.qty, 0)} шт. · закуп {rub(totalPurchase)} · розница {rub(totalRetail)} · маржа{" "}
-        {rub(totalRetail - totalPurchase)}
+        Итого: {lines.reduce((s, l) => s + l.qty, 0)} шт. · закуп {rub(totalPurchase)} · розница {rub(totalRetail)} ·
+        валовая прибыль {rub(totalRetail - totalPurchase)}
       </p>
 
       <form action={createStockDoc} className="grid gap-2 sm:grid-cols-2">
@@ -341,7 +393,11 @@ export function ReceiptCreateForm({
         <input type="hidden" name="payload" value={JSON.stringify(lines)} />
         <div>
           <Label>Поставщик</Label>
-          <select name="supplierId" defaultValue="__none__" className="mt-1 flex h-9 w-full border border-input bg-background px-3 text-sm">
+          <select
+            name="supplierId"
+            defaultValue="__none__"
+            className="mt-1 flex h-9 w-full border border-input bg-background px-3 text-sm"
+          >
             <option value="__none__">Не указан</option>
             {suppliers.map((s) => (
               <option key={s.id} value={s.id}>
@@ -364,7 +420,7 @@ export function ReceiptCreateForm({
         </div>
         <div>
           <Label>Оплачено, ₽</Label>
-          <Input name="paidAmount" type="number" defaultValue={0} />
+          <Input name="paidAmount" inputMode="numeric" defaultValue="" placeholder="" />
         </div>
         <div className="flex items-end">
           <label className={cn("flex items-center gap-2 text-sm")}>

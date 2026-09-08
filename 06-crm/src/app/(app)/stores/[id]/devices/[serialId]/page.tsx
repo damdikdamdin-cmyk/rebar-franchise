@@ -79,9 +79,6 @@ export default async function DeviceDetailPage({
         <h2 className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
           Редактировать устройство
         </h2>
-        <p className="mb-3 text-xs text-muted-foreground">
-          Смена IMEI, гарантии, цен и справок пишется в журнал. Старый IMEI остаётся в истории и находится поиском.
-        </p>
         <form action={updateDevice} className="grid gap-3 sm:grid-cols-2">
           <input type="hidden" name="storeId" value={storeId} />
           <input type="hidden" name="serialId" value={device.id} />
@@ -97,24 +94,24 @@ export default async function DeviceDetailPage({
             <Label>Гарантия, дней</Label>
             <Input
               name="warrantyDays"
-              type="number"
-              defaultValue={device.warrantyDays ?? device.product.warrantyDays}
+              inputMode="numeric"
+              defaultValue={String(device.warrantyDays ?? device.product.warrantyDays ?? 365)}
             />
           </div>
           <div>
             <Label>Закуп</Label>
             <Input
               name="purchasePrice"
-              type="number"
-              defaultValue={device.purchasePrice ?? device.product.purchasePrice}
+              inputMode="numeric"
+              defaultValue={String(device.purchasePrice ?? device.product.purchasePrice ?? "")}
             />
           </div>
           <div>
             <Label>Розница</Label>
             <Input
               name="retailPrice"
-              type="number"
-              defaultValue={device.retailPrice ?? device.product.retailPrice}
+              inputMode="numeric"
+              defaultValue={String(device.retailPrice ?? device.product.retailPrice ?? "")}
             />
           </div>
           <div className="sm:col-span-2">

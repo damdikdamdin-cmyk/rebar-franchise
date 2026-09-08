@@ -10,12 +10,18 @@ import { applyBalance, lineTotal, nextDocNumber, nextOrderNumber, nextSaleNumber
 import { ensureStoreCash, postCashTxn } from "@/lib/cash";
 import { nextProductBarcode } from "@/lib/barcode";
 import { writeChangeLog } from "@/lib/audit";
+import { can, type PermissionKey } from "@/lib/permissions";
+import { requireUserWithAccess } from "@/lib/session-access";
 
 async function loadStore(storeId: string) {
-  const user = await requireUser();
+  const user = await requireUserWithAccess();
   const store = await prisma.store.findUnique({ where: { id: storeId } });
   if (!store || !assertStoreAccess(user, store)) redirect("/");
   return { user, store };
+}
+
+function requirePerm(user: Awaited<ReturnType<typeof requireUserWithAccess>>, key: PermissionKey, storeId: string) {
+  if (!can(user, key)) redirect(`/stores/${storeId}`);
 }
 
 function revalidateStore(storeId: string) {
@@ -38,8 +44,8 @@ function revalidateStore(storeId: string) {
 }
 
 export async function upsertProduct(formData: FormData) {
-  const user = await requireUser();
-  if (!canEditCatalog(user.role)) redirect("/");
+  const user = await requireUserWithAccess();
+  if (!canEditCatalog(user.role) && !can(user, "prices.editCatalog")) redirect("/");
   const id = String(formData.get("id") ?? "");
   const data = {
     code: String(formData.get("code") ?? "").trim(),
@@ -49,15 +55,15 @@ export async function upsertProduct(formData: FormData) {
     groupId: String(formData.get("groupId") ?? "") || null,
     supplierId: String(formData.get("supplierId") ?? "") || null,
     unit: String(formData.get("unit") ?? "шт") || "шт",
-    warrantyDays: Number(formData.get("warrantyDays") ?? 365),
+    warrantyDays: Number(formData.get("warrantyDays") || 365),
     serialTracked: formData.get("serialTracked") === "on",
-    purchasePrice: Number(formData.get("purchasePrice") ?? 0),
-    retailPrice: Number(formData.get("retailPrice") ?? 0),
-    repairPrice: Number(formData.get("repairPrice") ?? 0),
-    preorderPrice: Number(formData.get("preorderPrice") ?? 0),
-    minStock: Number(formData.get("minStock") ?? 0),
-    commissionPct: Number(formData.get("commissionPct") ?? 0),
-    commissionRub: Number(formData.get("commissionRub") ?? 0),
+    purchasePrice: Number(formData.get("purchasePrice") || 0),
+    retailPrice: Number(formData.get("retailPrice") || 0),
+    repairPrice: Number(formData.get("repairPrice") || 0),
+    preorderPrice: Number(formData.get("preorderPrice") || 0),
+    minStock: Number(formData.get("minStock") || 0),
+    commissionPct: Number(formData.get("commissionPct") || 0),
+    commissionRub: Number(formData.get("commissionRub") || 0),
     description: String(formData.get("description") ?? "").trim() || null,
     active: formData.get("active") !== "off",
   };
@@ -140,6 +146,13 @@ export async function completeSale(formData: FormData) {
     return;
   }
   if (!lines.length) return;
+
+  // Проверка прав на скидку / правку цены
+  for (const line of lines) {
+    if (line.discountType !== "none" && line.discountValue > 0 && !can(user, "sales.discount")) {
+      redirect(`/stores/${storeId}/pos?error=discount`);
+    }
+  }
 
   const phone = String(formData.get("phone") ?? "").trim();
   const customerName = String(formData.get("customerName") ?? "").trim();
@@ -351,6 +364,16 @@ export async function createStockDoc(formData: FormData) {
   const storeId = String(formData.get("storeId") ?? "");
   const type = String(formData.get("type") ?? "") as StockDocType;
   const { user } = await loadStore(storeId);
+  const createKey: Partial<Record<StockDocType, PermissionKey>> = {
+    receipt: "receipts.create",
+    transfer: "transfers.create",
+    customer_return: "returns.create",
+    supplier_return: "returns.create",
+    inventory: "inventory.create",
+    writeoff: "writeoffs.create",
+  };
+  const key = createKey[type];
+  if (key) requirePerm(user, key, storeId);
   const comment = String(formData.get("comment") ?? "").trim() || null;
   const toStoreId = String(formData.get("toStoreId") ?? "") || null;
   const supplierId = String(formData.get("supplierId") ?? "") || null;
@@ -359,6 +382,7 @@ export async function createStockDoc(formData: FormData) {
     productId?: string | null;
     name?: string;
     code?: string;
+    barcode?: string;
     qty: number;
     price?: number;
     retailPrice?: number;
@@ -381,6 +405,7 @@ export async function createStockDoc(formData: FormData) {
         productId: line.productId,
         name: line.name,
         code: line.code,
+        barcode: line.barcode,
         purchasePrice: line.price ?? 0,
         retailPrice: line.retailPrice ?? 0,
         warrantyDays: line.warrantyDays,
@@ -494,11 +519,13 @@ async function ensureProductForReceiptLine(input: {
   productId?: string | null;
   name?: string;
   code?: string;
+  barcode?: string;
   purchasePrice: number;
   retailPrice: number;
   warrantyDays?: number;
   serialTracked: boolean;
 }) {
+  const barcode = (input.barcode ?? "").trim() || null;
   if (input.productId) {
     if (input.productId.startsWith("tmp-")) {
       // локальный черновик из UI — ищем/создаём по имени
@@ -511,6 +538,7 @@ async function ensureProductForReceiptLine(input: {
             ...(input.purchasePrice > 0 ? { purchasePrice: input.purchasePrice } : {}),
             ...(input.retailPrice > 0 ? { retailPrice: input.retailPrice } : {}),
             ...(input.warrantyDays != null ? { warrantyDays: input.warrantyDays } : {}),
+            ...(barcode ? { barcode } : {}),
             ...(input.serialTracked ? { serialTracked: true } : {}),
           },
         });
@@ -533,6 +561,7 @@ async function ensureProductForReceiptLine(input: {
           ...(input.purchasePrice > 0 ? { purchasePrice: input.purchasePrice } : {}),
           ...(input.retailPrice > 0 ? { retailPrice: input.retailPrice } : {}),
           ...(input.warrantyDays != null ? { warrantyDays: input.warrantyDays } : {}),
+          ...(barcode ? { barcode } : {}),
           ...(input.serialTracked ? { serialTracked: true } : {}),
           active: true,
         },
@@ -555,6 +584,7 @@ async function ensureProductForReceiptLine(input: {
           ...(input.purchasePrice > 0 ? { purchasePrice: input.purchasePrice } : {}),
           ...(input.retailPrice > 0 ? { retailPrice: input.retailPrice } : {}),
           ...(input.warrantyDays != null ? { warrantyDays: input.warrantyDays } : {}),
+          ...(barcode ? { barcode } : {}),
           ...(input.serialTracked ? { serialTracked: true } : {}),
           active: true,
         },
@@ -569,7 +599,7 @@ async function ensureProductForReceiptLine(input: {
     data: {
       code,
       name: name || code,
-      barcode: await nextProductBarcode(prisma, code),
+      barcode: barcode || (await nextProductBarcode(prisma, code)),
       purchasePrice: input.purchasePrice,
       retailPrice: input.retailPrice,
       warrantyDays: input.warrantyDays ?? 365,
@@ -591,6 +621,7 @@ export async function postExistingStockDoc(formData: FormData) {
 export async function createManualCashTxn(formData: FormData) {
   const storeId = String(formData.get("storeId") ?? "");
   const { user } = await loadStore(storeId);
+  requirePerm(user, "cash.operate", storeId);
   const registerId = String(formData.get("registerId") ?? "");
   const direction = String(formData.get("direction") ?? "out") as "in" | "out";
   const amount = Number(formData.get("amount") ?? 0);
@@ -606,7 +637,169 @@ export async function createManualCashTxn(formData: FormData) {
     note,
     recipient,
   });
+  await writeChangeLog({
+    storeId,
+    userId: user.id,
+    entityType: "cash",
+    entityId: registerId,
+    action: direction,
+    summary: `${user.name ?? "Сотрудник"} · касса ${direction === "in" ? "приход" : "расход"} ${amount} ₽${categoryName ? ` · ${categoryName}` : ""}${recipient ? ` · ${recipient}` : ""}`,
+  });
   revalidateStore(storeId);
+  revalidatePath(`/stores/${storeId}/audit`);
+}
+
+export async function createCashRegister(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const { user } = await loadStore(storeId);
+  requirePerm(user, "cash.manageRegisters", storeId);
+  const name = String(formData.get("name") ?? "").trim() || "Новая касса";
+  await prisma.cashRegister.create({
+    data: { storeId, name, balance: 0, active: true },
+  });
+  revalidateStore(storeId);
+  redirect(`/stores/${storeId}/cash`);
+}
+
+export async function renameCashRegister(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const { user } = await loadStore(storeId);
+  requirePerm(user, "cash.manageRegisters", storeId);
+  const registerId = String(formData.get("registerId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return;
+  const reg = await prisma.cashRegister.findUnique({ where: { id: registerId } });
+  if (!reg || reg.storeId !== storeId) return;
+  await prisma.cashRegister.update({ where: { id: registerId }, data: { name } });
+  revalidateStore(storeId);
+  redirect(`/stores/${storeId}/cash`);
+}
+
+/** Перемещение денег между кассами одной точки. */
+export async function transferCashBetweenRegisters(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const { user } = await loadStore(storeId);
+  requirePerm(user, "cash.operate", storeId);
+  const fromId = String(formData.get("fromRegisterId") ?? "");
+  const toId = String(formData.get("toRegisterId") ?? "");
+  const amount = Number(formData.get("amount") ?? 0);
+  const note = String(formData.get("note") ?? "").trim() || undefined;
+  if (!fromId || !toId || fromId === toId || amount <= 0) return;
+
+  const [from, to] = await Promise.all([
+    prisma.cashRegister.findUnique({ where: { id: fromId } }),
+    prisma.cashRegister.findUnique({ where: { id: toId } }),
+  ]);
+  if (!from || !to || from.storeId !== storeId || to.storeId !== storeId) return;
+
+  await postCashTxn({
+    registerId: fromId,
+    direction: "out",
+    amount,
+    categoryName: "Перемещение между кассами",
+    userId: user.id,
+    note: note ?? `→ ${to.name}`,
+    recipient: to.name,
+  });
+  await postCashTxn({
+    registerId: toId,
+    direction: "in",
+    amount,
+    categoryName: "Перемещение между кассами",
+    userId: user.id,
+    note: note ?? `← ${from.name}`,
+    recipient: from.name,
+  });
+  revalidateStore(storeId);
+  redirect(`/stores/${storeId}/cash`);
+}
+
+export async function upsertCashCategory(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  await loadStore(storeId);
+  const id = String(formData.get("id") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const direction = String(formData.get("direction") ?? "out") as "in" | "out";
+  if (!name) return;
+  if (id) {
+    const existing = await prisma.cashCategory.findUnique({ where: { id } });
+    if (!existing || existing.system) return;
+    await prisma.cashCategory.update({ where: { id }, data: { name, direction } });
+  } else {
+    await prisma.cashCategory.create({
+      data: { name, direction, system: false },
+    });
+  }
+  revalidateStore(storeId);
+  redirect(`/stores/${storeId}/cash`);
+}
+
+export async function deleteCashCategory(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  await loadStore(storeId);
+  const id = String(formData.get("id") ?? "");
+  const cat = await prisma.cashCategory.findUnique({ where: { id } });
+  if (!cat || cat.system) return;
+  await prisma.cashCategory.delete({ where: { id } });
+  revalidateStore(storeId);
+  redirect(`/stores/${storeId}/cash`);
+}
+
+export async function finishInventory(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const { user } = await loadStore(storeId);
+  requirePerm(user, "inventory.edit", storeId);
+  const payload = String(formData.get("payload") ?? "[]");
+  const comment = String(formData.get("comment") ?? "").trim() || "Инвентаризация";
+  let rows: Array<{
+    productId: string;
+    name: string;
+    qtyAccount: number;
+    qtyActual: number;
+    price: number;
+    retailPrice?: number;
+    serial?: string;
+  }> = [];
+  try {
+    rows = JSON.parse(payload);
+  } catch {
+    return;
+  }
+  if (!rows.length) return;
+
+  const doc = await prisma.stockDocument.create({
+    data: {
+      number: await nextDocNumber("I"),
+      type: "inventory",
+      storeId,
+      userId: user.id,
+      comment,
+      totalAmount: 0,
+      lines: {
+        create: rows.map((r) => ({
+          productId: r.productId,
+          qty: Math.max(0, r.qtyActual),
+          qtyAccount: r.qtyAccount,
+          qtyActual: r.qtyActual,
+          price: r.price,
+          retailPrice: r.retailPrice ?? 0,
+          serial: r.serial || null,
+        })),
+      },
+    },
+  });
+  await postStockDocument(doc.id, user.id);
+  await writeChangeLog({
+    storeId,
+    userId: user.id,
+    entityType: "stock_document",
+    entityId: doc.id,
+    action: "inventory_finish",
+    summary: `Инвентаризация ${doc.number}: позиций ${rows.length}`,
+    stockDocId: doc.id,
+  });
+  revalidateStore(storeId);
+  redirect(`/stores/${storeId}/inventories?done=${doc.id}`);
 }
 
 export async function createOrder(formData: FormData) {
@@ -830,10 +1023,17 @@ export async function cancelOrder(formData: FormData) {
 export async function payCommission(formData: FormData) {
   const storeId = String(formData.get("storeId") ?? "");
   const { user } = await loadStore(storeId);
+  requirePerm(user, "payroll.pay", storeId);
   const amount = Number(formData.get("amount") ?? 0);
   const recipient = String(formData.get("recipient") ?? "").trim();
   if (amount <= 0 || !recipient) return;
   const register = await ensureStoreCash(storeId);
+  // ensure salary category
+  await prisma.cashCategory.findFirst({ where: { name: "Зарплата", direction: "out" } }).then(async (c) => {
+    if (!c) {
+      await prisma.cashCategory.create({ data: { name: "Зарплата", direction: "out", system: true } });
+    }
+  });
   await postCashTxn({
     registerId: register.id,
     direction: "out",
@@ -841,10 +1041,132 @@ export async function payCommission(formData: FormData) {
     categoryName: "Зарплата",
     userId: user.id,
     recipient,
-    note: `Комиссия · ${recipient}`,
+    note: `Зарплата · ${recipient}`,
+  });
+  await writeChangeLog({
+    storeId,
+    userId: user.id,
+    entityType: "payroll",
+    entityId: storeId,
+    action: "pay",
+    summary: `${user.name ?? "Сотрудник"} выплатил зарплату ${recipient}: ${amount} ₽`,
   });
   revalidateStore(storeId);
   revalidatePath(`/stores/${storeId}/payroll`);
+  revalidatePath(`/stores/${storeId}/schedule`);
+  revalidatePath(`/stores/${storeId}/audit`);
+}
+
+export async function updateStaffPay(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const { user } = await loadStore(storeId);
+  requirePerm(user, "payroll.settings", storeId);
+  const userId = String(formData.get("userId") ?? "");
+  const commissionPct = Number(String(formData.get("commissionPct") ?? "").replace(",", "."));
+  const shiftPay = Number(formData.get("shiftPay") ?? 0);
+  const staff = await prisma.user.findUnique({ where: { id: userId } });
+  if (!staff || staff.storeId !== storeId) return;
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      commissionPct: Number.isFinite(commissionPct) ? commissionPct : 0,
+      shiftPay: Number.isFinite(shiftPay) ? Math.max(0, Math.round(shiftPay)) : 0,
+    },
+  });
+  revalidateStore(storeId);
+  revalidatePath(`/stores/${storeId}/payroll`);
+  revalidatePath(`/stores/${storeId}/schedule`);
+  redirect(`/stores/${storeId}/payroll`);
+}
+
+export async function upsertWorkShift(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const { user } = await loadStore(storeId);
+  requirePerm(user, "schedule.manage", storeId);
+  const id = String(formData.get("id") ?? "").trim();
+  const userId = String(formData.get("userId") ?? "");
+  const dateRaw = String(formData.get("date") ?? "").trim();
+  const startTime = String(formData.get("startTime") ?? "10:00").trim() || "10:00";
+  const endTime = String(formData.get("endTime") ?? "20:00").trim() || "20:00";
+  const note = String(formData.get("note") ?? "").trim() || null;
+  const shiftPayRaw = String(formData.get("shiftPay") ?? "").trim();
+  const shiftPay = shiftPayRaw === "" ? null : Math.max(0, Math.round(Number(shiftPayRaw) || 0));
+  const month = String(formData.get("month") ?? "").trim();
+  if (!userId || !dateRaw) return;
+
+  const staff = await prisma.user.findUnique({ where: { id: userId } });
+  if (!staff || (staff.storeId !== storeId && staff.role !== "partner")) return;
+
+  const date = new Date(`${dateRaw}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return;
+
+  const payLabel = shiftPay ?? staff.shiftPay ?? 0;
+  let action: "create" | "update" = "create";
+  let shiftId = id;
+
+  if (id) {
+    const existing = await prisma.workShift.findUnique({ where: { id } });
+    if (!existing || existing.storeId !== storeId || existing.deletedAt) return;
+    await prisma.workShift.update({
+      where: { id },
+      data: { userId, date, startTime, endTime, note, shiftPay },
+    });
+    action = "update";
+  } else {
+    const row = await prisma.workShift.upsert({
+      where: { storeId_userId_date: { storeId, userId, date } },
+      create: { storeId, userId, date, startTime, endTime, note, shiftPay },
+      update: { startTime, endTime, note, shiftPay, deletedAt: null },
+    });
+    shiftId = row.id;
+    action = "create";
+  }
+
+  await writeChangeLog({
+    storeId,
+    userId: user.id,
+    entityType: "work_shift",
+    entityId: shiftId,
+    action,
+    summary:
+      action === "update"
+        ? `${user.name ?? "Админ"} изменил смену ${staff.name} · ${dateRaw} · ${startTime}–${endTime} · ${payLabel} ₽`
+        : `${user.name ?? "Админ"} поставил в график ${staff.name} · ${dateRaw} · ${startTime}–${endTime} · ${payLabel} ₽`,
+    meta: { staffId: userId, date: dateRaw, startTime, endTime, shiftPay: payLabel },
+  });
+
+  revalidateStore(storeId);
+  revalidatePath(`/stores/${storeId}/schedule`);
+  revalidatePath(`/stores/${storeId}/payroll`);
+  revalidatePath(`/stores/${storeId}/audit`);
+  const q = month ? `?month=${month}` : "";
+  redirect(`/stores/${storeId}/schedule${q}`);
+}
+
+export async function deleteWorkShift(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const { user } = await loadStore(storeId);
+  requirePerm(user, "schedule.manage", storeId);
+  const id = String(formData.get("id") ?? "");
+  const month = String(formData.get("month") ?? "").trim();
+  const row = await prisma.workShift.findUnique({ where: { id }, include: { user: true } });
+  if (!row || row.storeId !== storeId || row.deletedAt) return;
+  await prisma.workShift.update({ where: { id }, data: { deletedAt: new Date() } });
+  const dateRaw = row.date.toISOString().slice(0, 10);
+  await writeChangeLog({
+    storeId,
+    userId: user.id,
+    entityType: "work_shift",
+    entityId: id,
+    action: "delete",
+    summary: `${user.name ?? "Админ"} убрал смену ${row.user.name} · ${dateRaw} · ${row.startTime}–${row.endTime} (сохранено в истории)`,
+  });
+  revalidateStore(storeId);
+  revalidatePath(`/stores/${storeId}/schedule`);
+  revalidatePath(`/stores/${storeId}/payroll`);
+  revalidatePath(`/stores/${storeId}/audit`);
+  const q = month ? `?month=${month}` : "";
+  redirect(`/stores/${storeId}/schedule${q}`);
 }
 
 export async function importProductsCsv(formData: FormData) {
@@ -1141,6 +1463,7 @@ export async function softDeleteSale(formData: FormData) {
   const saleId = String(formData.get("saleId") ?? "");
   const reason = String(formData.get("reason") ?? "").trim() || null;
   const { user } = await loadStore(storeId);
+  requirePerm(user, "sales.delete", storeId);
 
   const sale = await prisma.sale.findUnique({
     where: { id: saleId },
@@ -1221,6 +1544,7 @@ export async function softDeleteSaleLine(formData: FormData) {
   const storeId = String(formData.get("storeId") ?? "");
   const lineId = String(formData.get("lineId") ?? "");
   const { user } = await loadStore(storeId);
+  requirePerm(user, "sales.delete", storeId);
 
   const line = await prisma.saleLine.findUnique({
     where: { id: lineId },

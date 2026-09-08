@@ -30,21 +30,6 @@ export function SerialTrackedFields({
 
       {on ? (
         <div className="space-y-3 border border-border bg-background p-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-            Шаблон серийного номера
-          </p>
-          <div>
-            <Label htmlFor="imeiTemplate">Пример IMEI</Label>
-            <Input
-              id="imeiTemplate"
-              readOnly
-              value="356938035643809"
-              className="font-mono tracking-wider text-muted-foreground"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Обычно 15 цифр (IMEI) или латинский заводской S/N. При продаже поле обязательно.
-            </p>
-          </div>
           <div>
             <Label htmlFor="serialStoreId">Точка для новых S/N</Label>
             <select
@@ -62,13 +47,7 @@ export function SerialTrackedFields({
           </div>
           <div>
             <Label htmlFor="newSerials">Добавить IMEI / S/N (по одному на строку)</Label>
-            <Textarea
-              id="newSerials"
-              name="newSerials"
-              rows={4}
-              placeholder={"356938035643809\n356938035643810"}
-              className="font-mono"
-            />
+            <Textarea id="newSerials" name="newSerials" rows={4} className="font-mono" />
           </div>
           {existingSerials.length ? (
             <div>
@@ -77,7 +56,10 @@ export function SerialTrackedFields({
               </p>
               <ul className="max-h-40 space-y-1 overflow-auto text-sm">
                 {existingSerials.map((s) => (
-                  <li key={`${s.serial}-${s.storeCity}`} className="flex justify-between gap-2 border-b border-border py-1 font-mono text-xs">
+                  <li
+                    key={`${s.serial}-${s.storeCity}`}
+                    className="flex justify-between gap-2 border-b border-border py-1 font-mono text-xs"
+                  >
                     <span>{s.serial}</span>
                     <span className="text-muted-foreground">
                       {s.storeCity} · {s.status}

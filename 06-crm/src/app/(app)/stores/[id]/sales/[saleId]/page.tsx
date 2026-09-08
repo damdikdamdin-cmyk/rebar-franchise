@@ -69,7 +69,7 @@ export default async function SaleDetailPage({
           <DeletedMark at={sale.deletedAt} who={sale.deletedBy?.name} />
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          {dateTime(sale.soldAt)} · {sale.seller?.name ?? "—"} · {sale.customer?.name ?? "розница"}
+          {dateTime(sale.soldAt)} · продавец {sale.seller?.name ?? "—"} · {sale.customer?.name ?? "розница"}
         </p>
         {sale.deletedAt ? (
           <p className="mt-2 text-sm text-red-600">
@@ -154,10 +154,6 @@ export default async function SaleDetailPage({
           <h2 className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-red-600">
             Удалить чек
           </h2>
-          <p className="mb-3 text-xs text-muted-foreground">
-            Чек не уничтожается: помечается удалённым (красный ×), скрывается из обычных списков, остаётся в
-            истории. Остаток по позициям возвращается на склад, касса сторнируется.
-          </p>
           <form action={softDeleteSale} className="flex flex-wrap gap-2">
             <input type="hidden" name="storeId" value={storeId} />
             <input type="hidden" name="saleId" value={sale.id} />

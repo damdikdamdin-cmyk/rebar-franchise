@@ -80,14 +80,14 @@ export default async function ReportsPage({
   const profit = revenue - cost;
   const byProduct = new Map<
     string,
-    { name: string; qty: number; amount: number; cost: number; profit: number }
+    { id: string; name: string; qty: number; amount: number; cost: number; profit: number }
   >();
   for (const sale of sales) {
     if (sale.deletedAt) continue;
     for (const line of sale.lines) {
       if (line.deletedAt) continue;
       const key = line.productId ?? line.name;
-      const row = byProduct.get(key) ?? { name: line.name, qty: 0, amount: 0, cost: 0, profit: 0 };
+      const row = byProduct.get(key) ?? { id: key, name: line.name, qty: 0, amount: 0, cost: 0, profit: 0 };
       const lineCost = (line.costPrice || 0) * line.qty;
       row.qty += line.qty;
       row.amount += line.lineTotal;
@@ -179,7 +179,7 @@ export default async function ReportsPage({
           <p className="mt-1 font-mono text-xl">{rub(cost)}</p>
         </div>
         <div className="bg-card px-4 py-5">
-          <p className="font-mono text-[10px] uppercase text-muted-foreground">Прибыль</p>
+          <p className="font-mono text-[10px] uppercase text-muted-foreground">Валовая прибыль</p>
           <p className="mt-1 font-mono text-xl">{rub(profit)}</p>
         </div>
         <div className="bg-card px-4 py-5">
@@ -200,12 +200,12 @@ export default async function ReportsPage({
           {[...byProduct.values()]
             .sort((a, b) => b.amount - a.amount)
             .map((r) => (
-              <li key={r.name} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
                 <span>
                   {r.name} × {r.qty}
                 </span>
                 <span className="font-mono text-xs text-muted-foreground">
-                  закуп {rub(r.cost)} · розн {rub(r.amount)} · прибыль {rub(r.profit)}
+                  закуп {rub(r.cost)} · розн {rub(r.amount)} · валовая прибыль {rub(r.profit)}
                 </span>
               </li>
             ))}

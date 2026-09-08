@@ -12,20 +12,29 @@ export async function ensureStoreCash(storeId: string) {
 }
 
 export async function ensureCashCategories() {
-  const count = await prisma.cashCategory.count();
-  if (count > 0) return;
-  await prisma.cashCategory.createMany({
-    data: [
-      { name: "Продажа", direction: "in", system: true },
-      { name: "Предоплата заказа", direction: "in", system: true },
-      { name: "Оплата поставщику", direction: "out", system: true },
-      { name: "Возврат клиенту", direction: "out", system: true },
-      { name: "Выдача учредителю", direction: "out", system: false },
-      { name: "Логистика", direction: "out", system: false },
-      { name: "Прочий приход", direction: "in", system: false },
-      { name: "Прочий расход", direction: "out", system: false },
-    ],
-  });
+  const defaults = [
+    { name: "Продажа", direction: "in" as const, system: true },
+    { name: "Предоплата заказа", direction: "in" as const, system: true },
+    { name: "Оплата поставщику", direction: "out" as const, system: true },
+    { name: "Возврат клиенту", direction: "out" as const, system: true },
+    { name: "Инкассация на закупки", direction: "out" as const, system: true },
+    { name: "Инкассация на баланс поставщика", direction: "out" as const, system: true },
+    { name: "Перемещение между кассами", direction: "out" as const, system: true },
+      { name: "Перемещение между кассами", direction: "in" as const, system: true },
+      { name: "Зарплата", direction: "out" as const, system: true },
+      { name: "Выдача учредителю", direction: "out" as const, system: false },
+    { name: "Логистика", direction: "out" as const, system: false },
+    { name: "Прочий приход", direction: "in" as const, system: false },
+    { name: "Прочий расход", direction: "out" as const, system: false },
+  ];
+  for (const d of defaults) {
+    const exists = await prisma.cashCategory.findFirst({
+      where: { name: d.name, direction: d.direction },
+    });
+    if (!exists) {
+      await prisma.cashCategory.create({ data: d });
+    }
+  }
 }
 
 export async function postCashTxn(input: {

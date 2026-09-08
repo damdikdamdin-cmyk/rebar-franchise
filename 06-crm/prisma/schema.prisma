@@ -138,13 +138,18 @@ model User {
   partnerId     String?
   storeId       String?
   phone         String?
-  commissionPct Int       @default(0)
+  commissionPct Float     @default(0)
+  /// Оклад за смену, ₽
+  shiftPay      Int       @default(0)
+  /// Шаблон прав точки (галочки LiveSklad-style)
+  accessRoleId  String?
   onboardedAt   DateTime?
   lastSeenAt    DateTime?
   createdAt     DateTime  @default(now())
 
-  partner Partner? @relation("PartnerUsers", fields: [partnerId], references: [id], onDelete: SetNull)
-  store   Store?   @relation("StoreStaff", fields: [storeId], references: [id], onDelete: SetNull)
+  partner    Partner?    @relation("PartnerUsers", fields: [partnerId], references: [id], onDelete: SetNull)
+  store      Store?      @relation("StoreStaff", fields: [storeId], references: [id], onDelete: SetNull)
+  accessRole AccessRole? @relation(fields: [accessRoleId], references: [id], onDelete: SetNull)
 
   curatedPartners Partner[]        @relation("PartnerCurator")
   ownedLeads      Lead[]           @relation("LeadOwner")
@@ -165,6 +170,7 @@ model User {
   orders          Order[]
   printTemplates  PrintTemplate[]
   changeLogs      ChangeLog[]
+  workShifts      WorkShift[]
 }
 
 model PasswordReset {
@@ -179,20 +185,43 @@ model PasswordReset {
 }
 
 model Invite {
-  id          String    @id @default(cuid())
-  email       String
-  role        Role
-  token       String    @unique
-  partnerId   String?
-  storeId     String?
-  expiresAt   DateTime
-  usedAt      DateTime?
-  createdAt   DateTime  @default(now())
-  createdById String?
+  id           String    @id @default(cuid())
+  email        String
+  /// Имя до регистрации (показывается в документах после join)
+  nameHint     String?
+  role         Role
+  accessRoleId String?
+  token        String    @unique
+  partnerId    String?
+  storeId      String?
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime  @default(now())
+  createdById  String?
 
-  createdBy User?    @relation("InviteAuthor", fields: [createdById], references: [id], onDelete: SetNull)
-  partner   Partner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
-  store     Store?   @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  createdBy  User?       @relation("InviteAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  accessRole AccessRole? @relation(fields: [accessRoleId], references: [id], onDelete: SetNull)
+  partner    Partner?    @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  store      Store?      @relation(fields: [storeId], references: [id], onDelete: SetNull)
+}
+
+/// Шаблон прав точки (галочки как в LiveSklad). system=true — пресет сети.
+model AccessRole {
+  id          String   @id @default(cuid())
+  name        String
+  storeId     String?
+  homePage    String   @default("/pos")
+  /// JSON: Record<PermissionKey, boolean>
+  permissions String   @default("{}")
+  system      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store   Store?   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  users   User[]
+  invites Invite[]
+
+  @@index([storeId])
 }
 
 model Partner {
@@ -250,6 +279,8 @@ model Store {
   cashRegisters  CashRegister[]
   orders         Order[]
   changeLogs     ChangeLog[]
+  workShifts     WorkShift[]
+  accessRoles    AccessRole[]
 }
 
 // ---------- Воронка УК ----------
@@ -793,6 +824,30 @@ model OrderLine {
 
   order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+}
+
+/// Смена в графике работы точки.
+model WorkShift {
+  id        String    @id @default(cuid())
+  storeId   String
+  userId    String
+  /// Дата смены (день, локально YYYY-MM-DD в 12:00)
+  date      DateTime
+  startTime String    @default("10:00")
+  endTime   String    @default("20:00")
+  /// Оклад за эту смену; если null — берётся User.shiftPay
+  shiftPay  Int?
+  note      String?
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, userId, date])
+  @@index([storeId, date])
+  @@index([storeId, deletedAt])
 }
 
 /// Печатная форма: HTML-шаблон с переменными <Имя>.

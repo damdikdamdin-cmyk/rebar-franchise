@@ -40,7 +40,7 @@ export function navFor(role: Role): NavItem[] {
   if (isUk(role) || role === "partner" || STORE_ROLES.includes(role)) {
     items.push({ href: "/catalog/products", label: "Каталог", icon: "box", group: "Сеть" });
   }
-  if (canManageTeam(role) || role === "partner" || role === "uk_curator")
+  if (canManageTeam(role) || role === "partner" || role === "uk_curator" || role === "store_manager")
     items.push({ href: "/team", label: "Команда", icon: "team", group: "Настройки" });
   if (isUk(role) || role === "partner" || STORE_ROLES.includes(role)) {
     items.push({ href: "/settings/print-forms", label: "Печатные формы", icon: "print", group: "Настройки" });

@@ -27,7 +27,8 @@ description: >-
 | Карточка товара | `/catalog/products/[id]` | P0 |
 | Поступления | `/stores/[id]/receipts` | P0 |
 | Клиенты | `/stores/[id]/customers` | P0 |
-| Кассы / транзакции / cashflow | `/stores/[id]/cash*` | P1 |
+| Кассы / транзакции / cashflow | `/stores/[id]/cash*` | P0 |
+| Инвентаризации (✓/×, аналитика) | `/stores/[id]/inventories` | P0 |
 | Заказы / перемещения / возвраты / инвентаризации | `/stores/[id]/…` | P1 |
 | Отчёты / зарплата | `/stores/[id]/reports`, `payroll` | P1 |
 | Печатные формы | `/settings/print-forms` + `/print/[key]` | P0 |

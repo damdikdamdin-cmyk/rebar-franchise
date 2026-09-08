@@ -40,11 +40,38 @@ export async function acceptInvite(formData: FormData) {
   const email = invite.email.toLowerCase();
   const user = await prisma.user.upsert({
     where: { email },
-    update: { name, phone, passwordHash, role: invite.role, partnerId: invite.partnerId, storeId: invite.storeId },
-    create: { email, name, phone, passwordHash, role: invite.role, partnerId: invite.partnerId, storeId: invite.storeId },
+    update: {
+      name,
+      phone,
+      passwordHash,
+      role: invite.role,
+      partnerId: invite.partnerId,
+      storeId: invite.storeId,
+      accessRoleId: invite.accessRoleId,
+    },
+    create: {
+      email,
+      name,
+      phone,
+      passwordHash,
+      role: invite.role,
+      partnerId: invite.partnerId,
+      storeId: invite.storeId,
+      accessRoleId: invite.accessRoleId,
+    },
   });
   await prisma.invite.update({ where: { id: invite.id }, data: { usedAt: new Date() } });
   await enrollByRole(user.id, user.role);
+
+  const { writeChangeLog } = await import("@/lib/audit");
+  await writeChangeLog({
+    storeId: invite.storeId,
+    userId: user.id,
+    entityType: "user",
+    entityId: user.id,
+    action: "register",
+    summary: `${name} зарегистрировался по приглашению (${invite.role})`,
+  });
 
   if (invite.role === "partner" && invite.partnerId) {
     const partner = await prisma.partner.findUnique({ where: { id: invite.partnerId } });
@@ -61,7 +88,13 @@ export async function acceptInvite(formData: FormData) {
   }
 
   try {
-    await signIn("credentials", { email, password, redirectTo: user.role === "partner" ? "/onboarding" : "/" });
+    const home =
+      user.role === "partner"
+        ? "/onboarding"
+        : user.storeId
+          ? `/stores/${user.storeId}/pos`
+          : "/";
+    await signIn("credentials", { email, password, redirectTo: home });
   } catch (error) {
     if (error instanceof AuthError) redirect("/login?invited=1");
     throw error;

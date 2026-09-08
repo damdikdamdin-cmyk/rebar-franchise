@@ -121,7 +121,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   uk_curator: "Куратор запуска",
   uk_marketer: "Маркетолог УК",
   partner: "Партнёр",
-  store_manager: "Управляющий точкой",
+  store_manager: "Администратор точки",
   seller: "Продавец",
 };
 

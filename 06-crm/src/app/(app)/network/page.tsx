@@ -76,11 +76,11 @@ export default async function NetworkPage({
     .filter((row) => row.checks > 0 || row.store.status === "open")
     .sort((a, b) => b.revenue - a.revenue);
 
-  const productTotals = new Map<string, { name: string; qty: number; revenue: number }>();
+  const productTotals = new Map<string, { id: string; name: string; qty: number; revenue: number }>();
   for (const sale of sales) {
     for (const line of sale.lines) {
       const key = line.productId ?? line.name;
-      const prev = productTotals.get(key) ?? { name: line.name, qty: 0, revenue: 0 };
+      const prev = productTotals.get(key) ?? { id: key, name: line.name, qty: 0, revenue: 0 };
       prev.qty += line.qty;
       prev.revenue += line.lineTotal;
       productTotals.set(key, prev);
@@ -169,7 +169,7 @@ export default async function NetworkPage({
               <p className="eyebrow mb-2">Топ товаров</p>
               <Card className="divide-y divide-border">
                 {topProducts.map((p) => (
-                  <div key={p.name} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                  <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                     <div className="min-w-0 flex-1">
                       <p className="truncate">{p.name}</p>
                       <p className="text-xs text-muted-foreground">{p.qty} шт.</p>

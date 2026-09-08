@@ -97,9 +97,7 @@ export function StockTable({
             </button>
           </>
         ) : (
-          <span className="font-mono text-[10px] uppercase text-muted-foreground">
-            отметьте позиции для печати ценников
-          </span>
+          <span className="font-mono text-[10px] uppercase text-muted-foreground">печать ценников</span>
         )}
       </div>
       <div className="overflow-x-auto border border-border bg-card">

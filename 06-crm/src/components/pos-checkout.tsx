@@ -20,7 +20,7 @@ type ProductRow = {
   otherQty: number;
 };
 
-type SerialRow = { id: string; productId: string; serial: string };
+type SerialRow = { id: string; productId: string; serial: string; retailPrice?: number | null };
 type ImeiAlias = { oldSerial: string; serialId: string; productId: string; currentSerial: string };
 
 type CartLine = {
@@ -29,6 +29,7 @@ type CartLine = {
   name: string;
   qty: number;
   unitPrice: number;
+  priceText: string;
   discountType: "none" | "amount" | "percent";
   discountValue: number;
   discountText: string;
@@ -81,6 +82,8 @@ export function PosCheckout({
   const [scanMsg, setScanMsg] = useState<string | null>(null);
   const [printReceipt, setPrintReceipt] = useState(true);
   const [printWarranty, setPrintWarranty] = useState(true);
+  const [picker, setPicker] = useState<ProductRow | null>(null);
+  const [triedSubmit, setTriedSubmit] = useState(false);
 
   const preferredPrint = useMemo(() => {
     const keys = printKeys.length ? printKeys : ["receipt", "warranty"];
@@ -111,6 +114,18 @@ export function PosCheckout({
     },
     [serialByNorm, aliasByNorm, serials],
   );
+
+  const cartSerials = useMemo(
+    () => new Set(cart.map((l) => (l.serial ? normSerial(l.serial) : "")).filter(Boolean)),
+    [cart],
+  );
+
+  const availableForPicker = useMemo(() => {
+    if (!picker) return [];
+    return serials.filter(
+      (s) => s.productId === picker.id && !cartSerials.has(normSerial(s.serial)),
+    );
+  }, [picker, serials, cartSerials]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -145,39 +160,57 @@ export function PosCheckout({
   }, [products, query, resolveSerial, serials, imeiAliases]);
 
   const total = cart.reduce((s, l) => s + calcLine(l), 0);
-  const payload = cart.map(({ discountText: _t, serialTracked: _s, serialId: _id, ...line }) => line);
+  const payload = cart.map(({ discountText: _t, serialTracked: _s, serialId: _id, priceText: _p, ...line }) => line);
 
-  function addProduct(p: ProductRow, serial?: string, serialId?: string) {
+  function pushLine(p: ProductRow, serial?: string, serialId?: string, unitPrice?: number) {
     if (p.qty <= 0) {
       setScanMsg(`Нет остатка: ${p.name}`);
       return;
     }
     const sn = serial?.trim() || "";
-    const resolved = sn ? resolveSerial(sn) : undefined;
-    const currentSn = resolved?.serial ?? sn;
-    if (currentSn && cart.some((l) => l.serial && normSerial(l.serial) === normSerial(currentSn))) {
-      setScanMsg(`Уже в чеке: ${currentSn}`);
+    if (p.serialTracked && !sn) {
+      setPicker(p);
       return;
     }
+    if (sn && cartSerials.has(normSerial(sn))) {
+      setScanMsg(`Уже в чеке: ${sn}`);
+      return;
+    }
+    const price = unitPrice ?? p.retailPrice;
     setCart((prev) => {
       const next = [
         ...prev,
         {
           productId: p.id,
-          serialId: serialId ?? resolved?.id,
+          serialId,
           name: p.name,
           qty: 1,
-          unitPrice: p.retailPrice,
+          unitPrice: price,
+          priceText: String(price),
           discountType: "none" as const,
           discountValue: 0,
           discountText: "",
-          serialTracked: p.serialTracked || Boolean(currentSn),
-          serial: currentSn,
+          serialTracked: p.serialTracked || Boolean(sn),
+          serial: sn,
         },
       ];
       setEditing(next.length - 1);
       return next;
     });
+    setPicker(null);
+    setScanMsg(sn ? `${p.name} · ${sn}` : p.name);
+  }
+
+  function onProductClick(p: SearchHit) {
+    if (p.matchedSerial) {
+      pushLine(p, p.matchedSerial, p.matchedSerialId);
+      return;
+    }
+    if (p.serialTracked) {
+      setPicker(p);
+      return;
+    }
+    pushLine(p);
   }
 
   const onScan = useCallback(
@@ -187,13 +220,7 @@ export function PosCheckout({
       if (sn) {
         const product = products.find((p) => p.id === sn.productId);
         if (product) {
-          const viaOld = aliasByNorm.get(normSerial(raw));
-          addProduct(product, sn.serial, sn.id);
-          setScanMsg(
-            viaOld && normSerial(viaOld.oldSerial) === normSerial(raw)
-              ? `Добавлен по старому IMEI ${viaOld.oldSerial} → ${sn.serial}`
-              : `Добавлен по IMEI: ${product.name} · ${sn.serial}`,
-          );
+          pushLine(product, sn.serial, sn.id, sn.retailPrice ?? undefined);
           setQuery("");
           return;
         }
@@ -203,32 +230,63 @@ export function PosCheckout({
         products.find((p) => p.code === raw) ||
         products.find((p) => p.barcode?.endsWith(raw) || p.code.endsWith(raw));
       if (hit) {
-        addProduct(hit);
-        setScanMsg(`Добавлен: ${hit.name}`);
+        onProductClick(hit);
         setQuery("");
       } else {
         setQuery(raw);
         setScanMsg(`Не найден: ${raw}`);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- addProduct closes over cart
-    [products, resolveSerial, aliasByNorm, cart],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [products, resolveSerial, cartSerials],
   );
 
   useBarcodeScanner(onScan, !soldId);
 
-  const canSubmit =
-    cart.length > 0 &&
-    cart.every((l) => !l.serialTracked || (l.serial ?? "").trim().length > 0);
+  const missingSerial = cart.some((l) => l.serialTracked && !(l.serial ?? "").trim());
+  const canSubmit = cart.length > 0 && !missingSerial;
 
   return (
     <div className="space-y-4">
+      {picker ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[80vh] w-full max-w-lg overflow-auto border border-border bg-card p-4 shadow-lg">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-serif text-xl">{picker.name}</h3>
+                <p className="font-mono text-xs text-muted-foreground">Выберите IMEI / S/N со склада</p>
+              </div>
+              <button type="button" className="font-mono text-[10px] uppercase" onClick={() => setPicker(null)}>
+                закрыть
+              </button>
+            </div>
+            {!availableForPicker.length ? (
+              <p className="text-sm text-muted-foreground">Нет свободных IMEI на складе этой точки</p>
+            ) : (
+              <ul className="divide-y divide-border border border-border">
+                {availableForPicker.map((s) => (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left hover:bg-accent"
+                      onClick={() => pushLine(picker, s.serial, s.id, s.retailPrice ?? undefined)}
+                    >
+                      <span className="font-mono text-sm">{s.serial}</span>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {rub(s.retailPrice ?? picker.retailPrice)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      ) : null}
+
       {soldId ? (
         <div className="space-y-3 border border-border bg-card px-4 py-4">
           <p className="text-sm font-medium">Чек оформлен · остаток списан</p>
-          <p className="text-xs text-muted-foreground">
-            Нажмите кнопку печати вручную — авто-всплывающие окна браузер блокирует.
-          </p>
           <div className="flex flex-wrap gap-2">
             {preferredPrint.includes("receipt") ? (
               <a
@@ -272,12 +330,13 @@ export function PosCheckout({
           </div>
         </div>
       ) : null}
+
       <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
         <section className="border border-border bg-card">
           <div className="flex items-center gap-2 border-b border-border p-3">
             <Input
               data-barcode-input="1"
-              placeholder="Поиск, код, штрихкод или IMEI / старый IMEI…"
+              placeholder="Поиск, код, штрихкод или IMEI…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -307,16 +366,14 @@ export function PosCheckout({
                   <tr
                     key={`${p.id}-${p.matchedSerial ?? ""}`}
                     className={`border-b border-border ${p.qty > 0 ? "cursor-pointer hover:bg-accent" : "opacity-50"}`}
-                    onClick={() => addProduct(p, p.matchedSerial, p.matchedSerialId)}
+                    onClick={() => p.qty > 0 && onProductClick(p)}
                   >
                     <td className="px-3 py-2">
                       <div>{p.name}</div>
                       <div className="font-mono text-[10px] text-muted-foreground">
                         Код: {p.code}
-                        {p.barcode ? ` · ${p.barcode}` : ""}
                         {p.serialTracked ? " · S/N" : ""}
-                        {p.matchedSerial ? ` · IMEI ${p.matchedSerial}` : ""}
-                        {p.matchedViaOld ? ` · был ${p.matchedViaOld}` : ""}
+                        {p.matchedSerial ? ` · ${p.matchedSerial}` : ""}
                       </div>
                     </td>
                     <td className="px-3 py-2 font-mono">{p.qty}</td>
@@ -327,7 +384,7 @@ export function PosCheckout({
                 {!filtered.length ? (
                   <tr>
                     <td colSpan={4} className="px-3 py-6 text-sm text-muted-foreground">
-                      Ничего не найдено. Проверьте IMEI в поступлениях / устройствах или название модели.
+                      Ничего не найдено
                     </td>
                   </tr>
                 ) : null}
@@ -339,65 +396,95 @@ export function PosCheckout({
         <section className="border border-border bg-card p-4">
           <h2 className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Чек</h2>
           {!cart.length ? (
-            <p className="mt-6 text-sm text-muted-foreground">Выберите товар слева или введите код.</p>
+            <p className="mt-6 text-sm text-muted-foreground">Выберите товар слева</p>
           ) : (
             <ul className="mt-3 space-y-3">
               {cart.map((line, index) => (
-                <li key={`${line.productId}-${index}`} className="border border-border p-3">
+                <li key={`${line.productId}-${line.serial ?? index}-${index}`} className="border border-border p-3">
                   <div className="flex items-start justify-between gap-2">
-                    <button type="button" className="text-left text-sm font-medium" onClick={() => setEditing(index)}>
-                      {line.name}
-                    </button>
+                    <div>
+                      <p className="text-sm font-medium">{line.name}</p>
+                      {line.serial ? (
+                        <p className="mt-0.5 font-mono text-xs">IMEI {line.serial}</p>
+                      ) : line.serialTracked ? (
+                        <p className="mt-0.5 font-mono text-[10px] text-red-600">обязательно · IMEI</p>
+                      ) : null}
+                      <p className="mt-1 font-mono text-xs">
+                        {rub(line.unitPrice)} × {line.qty} = {rub(calcLine(line))}
+                      </p>
+                    </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
+                      <button
+                        type="button"
+                        className="font-mono text-[10px] uppercase underline"
+                        onClick={() => setEditing(editing === index ? null : index)}
+                      >
+                        Редактировать
+                      </button>
+                      <Link
+                        href={`/catalog/products/${line.productId}`}
+                        className="font-mono text-[10px] uppercase underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Номенклатура
+                      </Link>
                       {line.serialId ? (
                         <Link
                           href={`/stores/${storeId}/devices/${line.serialId}`}
                           className="font-mono text-[10px] uppercase underline"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          Редактировать
+                          Устройство
                         </Link>
                       ) : null}
                       <button
                         type="button"
                         className="font-mono text-[10px] text-muted-foreground"
-                        onClick={() => setCart((prev) => prev.filter((_, i) => i !== index))}
+                        onClick={() => {
+                          setCart((prev) => prev.filter((_, i) => i !== index));
+                          setEditing(null);
+                        }}
                       >
                         удалить
                       </button>
                     </div>
                   </div>
-                  <p className="mt-1 font-mono text-xs">
-                    {rub(line.unitPrice)} × {line.qty} = {rub(calcLine(line))}
-                    {line.serial ? ` · IMEI ${line.serial}` : ""}
-                  </p>
                   {editing === index ? (
                     <div className="mt-3 grid gap-2">
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <Label>Цена</Label>
                           <Input
-                            type="number"
-                            value={line.unitPrice}
-                            onChange={(e) =>
+                            inputMode="numeric"
+                            value={line.priceText}
+                            onChange={(e) => {
+                              const priceText = e.target.value.replace(/[^\d]/g, "");
                               setCart((prev) =>
                                 prev.map((l, i) =>
-                                  i === index ? { ...l, unitPrice: Number(e.target.value) || 0 } : l,
+                                  i === index
+                                    ? {
+                                        ...l,
+                                        priceText,
+                                        unitPrice: priceText ? Number(priceText) : 0,
+                                      }
+                                    : l,
                                 ),
-                              )
-                            }
+                              );
+                            }}
                           />
                         </div>
                         <div>
                           <Label>Кол-во</Label>
                           <Input
-                            type="number"
-                            min={1}
-                            value={line.qty}
+                            inputMode="numeric"
+                            value={String(line.qty)}
+                            disabled={line.serialTracked}
                             onChange={(e) =>
                               setCart((prev) =>
                                 prev.map((l, i) =>
-                                  i === index ? { ...l, qty: Math.max(1, Number(e.target.value) || 1) } : l,
+                                  i === index
+                                    ? { ...l, qty: Math.max(1, Number(e.target.value.replace(/[^\d]/g, "")) || 1) }
+                                    : l,
                                 ),
                               )
                             }
@@ -437,7 +524,6 @@ export function PosCheckout({
                           <Input
                             className="mt-2"
                             inputMode="decimal"
-                            placeholder="0"
                             value={line.discountText}
                             onChange={(e) => {
                               const discountText = e.target.value.replace(/[^\d.,]/g, "");
@@ -456,31 +542,6 @@ export function PosCheckout({
                           />
                         ) : null}
                       </div>
-                      {line.serialTracked ? (
-                        <div>
-                          <Label>IMEI / S/N</Label>
-                          <Input
-                            placeholder="356938035643809"
-                            value={line.serial ?? ""}
-                            onChange={(e) =>
-                              setCart((prev) =>
-                                prev.map((l, i) => (i === index ? { ...l, serial: e.target.value } : l)),
-                              )
-                            }
-                          />
-                          <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                            Смена IMEI в карточке устройства — с записью в историю
-                          </p>
-                          {line.serialId ? (
-                            <Link
-                              href={`/stores/${storeId}/devices/${line.serialId}`}
-                              className="mt-2 inline-block font-mono text-[10px] uppercase underline"
-                            >
-                              Карточка: гарантия, справки, IMEI
-                            </Link>
-                          ) : null}
-                        </div>
-                      ) : null}
                     </div>
                   ) : null}
                 </li>
@@ -488,7 +549,14 @@ export function PosCheckout({
             </ul>
           )}
 
-          <form action={completeSale} className="mt-4 space-y-3 border-t border-border pt-4">
+          <form
+            action={completeSale}
+            className="mt-4 space-y-3 border-t border-border pt-4"
+            onSubmit={(e) => {
+              setTriedSubmit(true);
+              if (!canSubmit) e.preventDefault();
+            }}
+          >
             <input type="hidden" name="storeId" value={storeId} />
             <input type="hidden" name="payload" value={JSON.stringify(payload)} />
             <div className="grid gap-2 sm:grid-cols-2">
@@ -502,7 +570,7 @@ export function PosCheckout({
               </div>
               <div>
                 <Label htmlFor="creditAmount">Lendo, ₽</Label>
-                <Input id="creditAmount" name="creditAmount" type="number" defaultValue={0} />
+                <Input id="creditAmount" name="creditAmount" inputMode="numeric" defaultValue="" />
               </div>
               <div>
                 <Label htmlFor="note">Комментарий</Label>
@@ -535,8 +603,8 @@ export function PosCheckout({
             <Button type="submit" className="w-full" disabled={!canSubmit}>
               Оформить · {rub(total)}
             </Button>
-            {!canSubmit && cart.length ? (
-              <p className="text-xs text-muted-foreground">Укажите IMEI / S/N для серийных позиций.</p>
+            {triedSubmit && missingSerial ? (
+              <p className="text-xs text-red-600">Укажите IMEI для серийных позиций</p>
             ) : null}
           </form>
         </section>

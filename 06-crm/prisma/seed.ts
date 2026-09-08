@@ -52,11 +52,33 @@ async function main() {
   await prisma.lead.deleteMany();
   await prisma.invite.deleteMany();
   await prisma.passwordReset.deleteMany();
+  await prisma.workShift.deleteMany();
+  await prisma.changeLog.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.accessRole.deleteMany();
   await prisma.store.deleteMany();
   await prisma.partner.deleteMany();
 
   for (const s of SPACES) await prisma.kbSpace.create({ data: s });
+
+  // Пресеты прав точки
+  const { serializePermissions, sellerDefaults, storeManagerDefaults } = await import("../src/lib/permissions");
+  const sellerRole = await prisma.accessRole.create({
+    data: {
+      name: "Продавец",
+      homePage: "/pos",
+      permissions: serializePermissions(sellerDefaults()),
+      system: true,
+    },
+  });
+  const managerRole = await prisma.accessRole.create({
+    data: {
+      name: "Администратор точки",
+      homePage: "",
+      permissions: serializePermissions(storeManagerDefaults()),
+      system: true,
+    },
+  });
 
   const founder = await prisma.user.create({
     data: { email: "damdikdamdin@gmail.com", name: "Дамдин Цыпылов", role: "founder", passwordHash, onboardedAt: new Date() },
@@ -93,13 +115,23 @@ async function main() {
       name: "Управляющий Улан-Удэ",
       role: "store_manager",
       storeId: ulan.id,
+      accessRoleId: managerRole.id,
       passwordHash,
       commissionPct: 2,
       onboardedAt: new Date(),
     },
   });
   await prisma.user.create({
-    data: { email: "irkutsk@rebar.local", name: "Продавец Иркутск", role: "seller", storeId: irkutsk.id, passwordHash, commissionPct: 2, onboardedAt: new Date() },
+    data: {
+      email: "irkutsk@rebar.local",
+      name: "Продавец Иркутск",
+      role: "seller",
+      storeId: irkutsk.id,
+      accessRoleId: sellerRole.id,
+      passwordHash,
+      commissionPct: 2,
+      onboardedAt: new Date(),
+    },
   });
 
   // --- Розница: каталог, остатки, касса ---
