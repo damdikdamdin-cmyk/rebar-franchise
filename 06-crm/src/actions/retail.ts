@@ -12,6 +12,8 @@ import { nextProductBarcode } from "@/lib/barcode";
 import { writeChangeLog } from "@/lib/audit";
 import { can, type PermissionKey } from "@/lib/permissions";
 import { requireUserWithAccess } from "@/lib/session-access";
+import { getOpenInventory } from "@/lib/inventory-lock";
+import { normalizePhone } from "@/lib/phone";
 
 async function loadStore(storeId: string) {
   const user = await requireUserWithAccess();
@@ -121,7 +123,7 @@ export async function createSupplier(formData: FormData) {
   const user = await requireUser();
   if (!canEditCatalog(user.role)) redirect("/");
   const name = String(formData.get("name") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim() || null;
+  const phone = normalizePhone(String(formData.get("phone") ?? "")) || null;
   if (!name) return;
   await prisma.supplier.create({ data: { name, phone } });
   revalidatePath("/catalog/products");
@@ -130,6 +132,12 @@ export async function createSupplier(formData: FormData) {
 export async function completeSale(formData: FormData) {
   const storeId = String(formData.get("storeId") ?? "");
   const { user } = await loadStore(storeId);
+
+  const openInv = await getOpenInventory(storeId);
+  if (openInv) {
+    redirect(`/stores/${storeId}/pos?error=inventory`);
+  }
+
   const payload = String(formData.get("payload") ?? "");
   let lines: Array<{
     productId: string;
@@ -154,7 +162,7 @@ export async function completeSale(formData: FormData) {
     }
   }
 
-  const phone = String(formData.get("phone") ?? "").trim();
+  const phone = normalizePhone(String(formData.get("phone") ?? ""));
   const customerName = String(formData.get("customerName") ?? "").trim();
   const creditAmount = Number(formData.get("creditAmount") ?? 0);
   const note = String(formData.get("note") ?? "").trim() || null;
@@ -398,6 +406,17 @@ export async function createStockDoc(formData: FormData) {
     return;
   }
   if (!rawLines.length) return;
+
+  const serialsSeen = new Set<string>();
+  for (const line of rawLines) {
+    const sn = (line.serial ?? "").trim();
+    if (!sn) continue;
+    const key = sn.toLowerCase();
+    if (serialsSeen.has(key)) {
+      redirect(`/stores/${storeId}/receipts?error=dup_imei`);
+    }
+    serialsSeen.add(key);
+  }
 
   const lines = await Promise.all(
     rawLines.map(async (line) => {
@@ -745,8 +764,86 @@ export async function deleteCashCategory(formData: FormData) {
   redirect(`/stores/${storeId}/cash`);
 }
 
+/** Начать инвентаризацию точки: черновик документа → продажи только этой точки блокируются. */
+export async function startInventory(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const { user } = await loadStore(storeId);
+  requirePerm(user, "inventory.create", storeId);
+
+  const existing = await getOpenInventory(storeId);
+  if (existing) {
+    revalidateStore(storeId);
+    redirect(`/stores/${storeId}/inventories`);
+  }
+
+  const doc = await prisma.stockDocument.create({
+    data: {
+      number: await nextDocNumber("I"),
+      type: "inventory",
+      storeId,
+      userId: user.id,
+      comment: "Инвентаризация в процессе",
+      totalAmount: 0,
+    },
+  });
+  await writeChangeLog({
+    storeId,
+    userId: user.id,
+    entityType: "stock_document",
+    entityId: doc.id,
+    action: "inventory_start",
+    summary: `Начата инвентаризация ${doc.number} — продажи точки приостановлены`,
+    stockDocId: doc.id,
+  });
+  revalidateStore(storeId);
+  redirect(`/stores/${storeId}/inventories`);
+}
+
+/** Отменить открытую инвентаризацию (черновик) — продажи снова доступны. */
+export async function cancelInventory(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const documentId = String(formData.get("documentId") ?? "").trim();
+  const { user } = await loadStore(storeId);
+  requirePerm(user, "inventory.edit", storeId);
+
+  const doc = await prisma.stockDocument.findFirst({
+    where: {
+      id: documentId || undefined,
+      storeId,
+      type: "inventory",
+      postedAt: null,
+      deletedAt: null,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!doc) {
+    redirect(`/stores/${storeId}/inventories`);
+  }
+
+  await prisma.stockDocument.update({
+    where: { id: doc.id },
+    data: {
+      deletedAt: new Date(),
+      deletedById: user.id,
+      deletedReason: "Отмена инвентаризации",
+    },
+  });
+  await writeChangeLog({
+    storeId,
+    userId: user.id,
+    entityType: "stock_document",
+    entityId: doc.id,
+    action: "inventory_cancel",
+    summary: `Отменена инвентаризация ${doc.number} — продажи точки снова доступны`,
+    stockDocId: doc.id,
+  });
+  revalidateStore(storeId);
+  redirect(`/stores/${storeId}/inventories`);
+}
+
 export async function finishInventory(formData: FormData) {
   const storeId = String(formData.get("storeId") ?? "");
+  const documentId = String(formData.get("documentId") ?? "").trim();
   const { user } = await loadStore(storeId);
   requirePerm(user, "inventory.edit", storeId);
   const payload = String(formData.get("payload") ?? "[]");
@@ -767,27 +864,51 @@ export async function finishInventory(formData: FormData) {
   }
   if (!rows.length) return;
 
-  const doc = await prisma.stockDocument.create({
-    data: {
-      number: await nextDocNumber("I"),
-      type: "inventory",
-      storeId,
-      userId: user.id,
-      comment,
-      totalAmount: 0,
-      lines: {
-        create: rows.map((r) => ({
-          productId: r.productId,
-          qty: Math.max(0, r.qtyActual),
-          qtyAccount: r.qtyAccount,
-          qtyActual: r.qtyActual,
-          price: r.price,
-          retailPrice: r.retailPrice ?? 0,
-          serial: r.serial || null,
-        })),
+  let doc = documentId
+    ? await prisma.stockDocument.findFirst({
+        where: {
+          id: documentId,
+          storeId,
+          type: "inventory",
+          postedAt: null,
+          deletedAt: null,
+        },
+      })
+    : await getOpenInventory(storeId);
+
+  if (!doc) {
+    doc = await prisma.stockDocument.create({
+      data: {
+        number: await nextDocNumber("I"),
+        type: "inventory",
+        storeId,
+        userId: user.id,
+        comment,
+        totalAmount: 0,
       },
-    },
+    });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.stockLine.deleteMany({ where: { documentId: doc!.id } });
+    await tx.stockLine.createMany({
+      data: rows.map((r) => ({
+        documentId: doc!.id,
+        productId: r.productId,
+        qty: Math.max(0, r.qtyActual),
+        qtyAccount: r.qtyAccount,
+        qtyActual: r.qtyActual,
+        price: r.price,
+        retailPrice: r.retailPrice ?? 0,
+        serial: r.serial || null,
+      })),
+    });
+    await tx.stockDocument.update({
+      where: { id: doc!.id },
+      data: { comment, userId: user.id },
+    });
   });
+
   await postStockDocument(doc.id, user.id);
   await writeChangeLog({
     storeId,
@@ -795,17 +916,140 @@ export async function finishInventory(formData: FormData) {
     entityType: "stock_document",
     entityId: doc.id,
     action: "inventory_finish",
-    summary: `Инвентаризация ${doc.number}: позиций ${rows.length}`,
+    summary: `Инвентаризация ${doc.number}: позиций ${rows.length} — продажи точки снова доступны`,
     stockDocId: doc.id,
   });
   revalidateStore(storeId);
   redirect(`/stores/${storeId}/inventories?done=${doc.id}`);
 }
 
+/** Мягкое удаление складского документа (поступление и др.): сторно остатков/серий/кассы если проведён. */
+export async function softDeleteStockDoc(formData: FormData) {
+  const storeId = String(formData.get("storeId") ?? "");
+  const documentId = String(formData.get("documentId") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim() || null;
+  const { user } = await loadStore(storeId);
+
+  const doc = await prisma.stockDocument.findUnique({
+    where: { id: documentId },
+    include: { lines: { include: { product: true } }, cashTxns: true },
+  });
+  if (!doc || doc.storeId !== storeId || doc.deletedAt) return;
+
+  const deleteKey: Partial<Record<StockDocType, PermissionKey>> = {
+    receipt: "receipts.delete",
+    transfer: "transfers.delete",
+    customer_return: "returns.delete",
+    supplier_return: "returns.delete",
+    inventory: "inventory.delete",
+    writeoff: "writeoffs.delete",
+  };
+  const key = deleteKey[doc.type];
+  if (key) requirePerm(user, key, storeId);
+
+  if (doc.postedAt) {
+    await prisma.$transaction(async (tx) => {
+      for (const line of doc.lines) {
+        switch (doc.type) {
+          case "receipt":
+          case "customer_return": {
+            await applyBalance(tx, doc.storeId, line.productId, -line.qty);
+            if (line.serial) {
+              await tx.productSerial.updateMany({
+                where: { productId: line.productId, serial: line.serial, storeId: doc.storeId },
+                data: { status: "written_off" },
+              });
+            }
+            break;
+          }
+          case "supplier_return":
+          case "writeoff": {
+            await applyBalance(tx, doc.storeId, line.productId, line.qty);
+            if (line.serial) {
+              await tx.productSerial.updateMany({
+                where: { productId: line.productId, serial: line.serial },
+                data: { status: "in_stock", storeId: doc.storeId },
+              });
+            }
+            break;
+          }
+          case "transfer": {
+            if (doc.toStoreId) {
+              await applyBalance(tx, doc.toStoreId, line.productId, -line.qty);
+              await applyBalance(tx, doc.storeId, line.productId, line.qty);
+              if (line.serial) {
+                await tx.productSerial.updateMany({
+                  where: { productId: line.productId, serial: line.serial },
+                  data: { storeId: doc.storeId, status: "in_stock" },
+                });
+              }
+            }
+            break;
+          }
+          case "inventory": {
+            const delta = line.qtyActual - line.qtyAccount;
+            if (delta !== 0) await applyBalance(tx, doc.storeId, line.productId, -delta);
+            if (line.serial && line.qtyActual <= 0 && line.qtyAccount > 0) {
+              await tx.productSerial.updateMany({
+                where: { productId: line.productId, serial: line.serial, storeId: doc.storeId },
+                data: { status: "in_stock" },
+              });
+            }
+            break;
+          }
+          default:
+            break;
+        }
+      }
+    });
+
+    if (doc.type === "receipt" && doc.paidAmount > 0) {
+      const register = await ensureStoreCash(storeId);
+      await postCashTxn({
+        registerId: register.id,
+        direction: "in",
+        amount: doc.paidAmount,
+        categoryName: "Сторно оплаты поставщику",
+        stockDocId: doc.id,
+        userId: user.id,
+        note: `Удаление ${doc.number}`,
+      });
+    }
+  }
+
+  await prisma.stockDocument.update({
+    where: { id: doc.id },
+    data: {
+      deletedAt: new Date(),
+      deletedById: user.id,
+      deletedReason: reason,
+    },
+  });
+  await writeChangeLog({
+    storeId,
+    userId: user.id,
+    entityType: "stock_document",
+    entityId: doc.id,
+    action: "soft_delete",
+    summary: `Документ ${doc.number} помечен удалённым${reason ? `: ${reason}` : ""}`,
+    stockDocId: doc.id,
+    meta: { type: doc.type, reason },
+  });
+
+  revalidateStore(storeId);
+  const back =
+    doc.type === "receipt"
+      ? `/stores/${storeId}/receipts/${doc.id}`
+      : doc.type === "inventory"
+        ? `/stores/${storeId}/inventories`
+        : `/stores/${storeId}/receipts`;
+  redirect(back);
+}
+
 export async function createOrder(formData: FormData) {
   const storeId = String(formData.get("storeId") ?? "");
   const { user } = await loadStore(storeId);
-  const phone = String(formData.get("phone") ?? "").trim();
+  const phone = normalizePhone(String(formData.get("phone") ?? ""));
   const customerName = String(formData.get("customerName") ?? "").trim();
   const comment = String(formData.get("comment") ?? "").trim() || null;
   const prepaidAmount = Number(formData.get("prepaidAmount") ?? 0);
@@ -1298,7 +1542,7 @@ export async function createCustomer(formData: FormData) {
   const user = await requireUser();
   const storeId = String(formData.get("storeId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim();
+  const phone = normalizePhone(String(formData.get("phone") ?? ""));
   const notes = String(formData.get("notes") ?? "").trim() || null;
   if (!storeId || !name || !phone) return;
 

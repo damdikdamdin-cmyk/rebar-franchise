@@ -1,17 +1,18 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { PosCheckout } from "@/components/pos-checkout";
+import { getOpenInventory } from "@/lib/inventory-lock";
 
 export default async function PosPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ sold?: string; print?: string }>;
+  searchParams: Promise<{ sold?: string; print?: string; error?: string }>;
 }) {
   const { id } = await params;
-  const { sold, print } = await searchParams;
-  const [products, serials, imeiLogs] = await Promise.all([
+  const { sold, print, error } = await searchParams;
+  const [products, serials, imeiLogs, openInventory] = await Promise.all([
     prisma.product.findMany({
       where: { active: true, deletedAt: null },
       include: { balances: true },
@@ -34,6 +35,7 @@ export default async function PosPage({
       orderBy: { createdAt: "desc" },
       take: 5000,
     }),
+    getOpenInventory(id),
   ]);
 
   const serialById = new Map(serials.map((s) => [s.id, s]));
@@ -80,6 +82,12 @@ export default async function PosPage({
           История чеков
         </Link>
       </div>
+      {error === "inventory" && !openInventory ? (
+        <p className="text-sm text-destructive">Продажа заблокирована на время инвентаризации этой точки.</p>
+      ) : null}
+      {error === "discount" ? (
+        <p className="text-sm text-destructive">Недостаточно прав на скидку.</p>
+      ) : null}
       <PosCheckout
         storeId={id}
         products={rows}
@@ -87,6 +95,8 @@ export default async function PosPage({
         imeiAliases={imeiAliases}
         soldId={sold}
         printKeys={printKeys}
+        salesLocked={Boolean(openInventory)}
+        inventoryDocId={openInventory?.id ?? null}
       />
     </div>
   );

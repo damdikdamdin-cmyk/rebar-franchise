@@ -68,6 +68,8 @@ export function PosCheckout({
   imeiAliases = [],
   soldId,
   printKeys = [],
+  salesLocked = false,
+  inventoryDocId,
 }: {
   storeId: string;
   products: ProductRow[];
@@ -75,6 +77,8 @@ export function PosCheckout({
   imeiAliases?: ImeiAlias[];
   soldId?: string;
   printKeys?: string[];
+  salesLocked?: boolean;
+  inventoryDocId?: string | null;
 }) {
   const [query, setQuery] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -241,13 +245,22 @@ export function PosCheckout({
     [products, resolveSerial, cartSerials],
   );
 
-  useBarcodeScanner(onScan, !soldId);
+  useBarcodeScanner(onScan, !soldId && !salesLocked);
 
   const missingSerial = cart.some((l) => l.serialTracked && !(l.serial ?? "").trim());
-  const canSubmit = cart.length > 0 && !missingSerial;
+  const canSubmit = cart.length > 0 && !missingSerial && !salesLocked;
 
   return (
     <div className="space-y-4">
+      {salesLocked ? (
+        <div className="border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          Продажи этой точки приостановлены — идёт инвентаризация.{" "}
+          <Link href={`/stores/${storeId}/inventories`} className="underline">
+            К инвентаризации
+          </Link>
+          <span className="ml-2 font-mono text-[10px] text-amber-800/80">· другие точки работают как обычно</span>
+        </div>
+      ) : null}
       {picker ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[80vh] w-full max-w-lg overflow-auto border border-border bg-card p-4 shadow-lg">
@@ -566,7 +579,15 @@ export function PosCheckout({
               </div>
               <div>
                 <Label htmlFor="phone">Телефон</Label>
-                <Input id="phone" name="phone" />
+                <Input
+                  id="phone"
+                  name="phone"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  onChange={(e) => {
+                    e.target.value = e.target.value.replace(/\D/g, "");
+                  }}
+                />
               </div>
               <div>
                 <Label htmlFor="creditAmount">Lendo, ₽</Label>

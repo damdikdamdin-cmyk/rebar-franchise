@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { finishInventory } from "@/actions/retail";
-import { Button } from "@/components/ui/button";
+import { useEffect, useMemo, useState } from "react";
+import { cancelInventory, finishInventory, startInventory } from "@/actions/retail";
 import { Input, Label } from "@/components/ui/fields";
 import { rub } from "@/lib/format-client";
 import { cn } from "@/lib/utils";
@@ -25,15 +24,21 @@ export function InventoryWorkspace({
   storeId,
   rows,
   doneId,
+  openInventoryId,
 }: {
   storeId: string;
   rows: InventoryRow[];
   doneId?: string;
+  openInventoryId?: string | null;
 }) {
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(Boolean(openInventoryId));
   const [marks, setMarks] = useState<Record<string, Mark>>({});
   const [query, setQuery] = useState("");
   const [extraKeys, setExtraKeys] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (openInventoryId) setStarted(true);
+  }, [openInventoryId]);
 
   const allRows = useMemo(() => {
     const base = rows;
@@ -126,11 +131,19 @@ export function InventoryWorkspace({
     setQuery(r.name);
   }
 
+  const activeDocId = openInventoryId ?? "";
+
   return (
     <div className="space-y-6">
       {doneId ? (
         <div className="border border-border bg-card px-4 py-3 text-sm">
-          Инвентаризация проведена · документ сохранён
+          Инвентаризация проведена · документ сохранён · продажи точки снова доступны
+        </div>
+      ) : null}
+
+      {openInventoryId ? (
+        <div className="border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          Идёт инвентаризация этой точки — продажи на кассе этой точки приостановлены. Другие города не затронуты.
         </div>
       ) : null}
 
@@ -157,32 +170,49 @@ export function InventoryWorkspace({
       </section>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => {
-            setStarted(true);
-            setMarks({});
-          }}
-          className={cn(
-            "border px-4 py-6 text-left",
-            started ? "border-foreground bg-foreground text-background" : "border-border bg-card",
-          )}
-        >
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em]">Начать инвентаризацию</p>
-          <p className="mt-2 text-sm opacity-80">Загрузить остатки точки и отмечать позиции</p>
-        </button>
+        {!openInventoryId ? (
+          <form action={startInventory}>
+            <input type="hidden" name="storeId" value={storeId} />
+            <button
+              type="submit"
+              onClick={() => {
+                setStarted(true);
+                setMarks({});
+              }}
+              className="h-full w-full border border-border bg-card px-4 py-6 text-left hover:border-foreground"
+            >
+              <p className="font-mono text-[11px] uppercase tracking-[0.14em]">Начать инвентаризацию</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Блокирует продажи только этой точки до завершения
+              </p>
+            </button>
+          </form>
+        ) : (
+          <div className="border border-foreground bg-foreground px-4 py-6 text-background">
+            <p className="font-mono text-[11px] uppercase tracking-[0.14em]">Инвентаризация начата</p>
+            <p className="mt-2 text-sm opacity-80">Отмечайте позиции ✓ / × · продажи точки закрыты</p>
+            <form action={cancelInventory} className="mt-4">
+              <input type="hidden" name="storeId" value={storeId} />
+              <input type="hidden" name="documentId" value={activeDocId} />
+              <button type="submit" className="border border-background/40 px-3 py-1.5 font-mono text-[10px] uppercase">
+                Отменить
+              </button>
+            </form>
+          </div>
+        )}
         <form action={finishInventory}>
           <input type="hidden" name="storeId" value={storeId} />
+          <input type="hidden" name="documentId" value={activeDocId} />
           <input type="hidden" name="payload" value={JSON.stringify(payload)} />
           <input type="hidden" name="comment" value="Инвентаризация точки" />
           <button
             type="submit"
-            disabled={!started || stats.checked === 0}
+            disabled={!started || !openInventoryId || stats.checked === 0}
             className="h-full w-full border border-border bg-card px-4 py-6 text-left disabled:opacity-40"
           >
             <p className="font-mono text-[11px] uppercase tracking-[0.14em]">Закончить инвентаризацию</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Создать документ расхождений · отмечено {stats.checked}/{allRows.length}
+              Провести документ · отмечено {stats.checked}/{allRows.length} · продажи снова доступны
             </p>
           </button>
         </form>

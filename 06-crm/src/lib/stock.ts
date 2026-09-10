@@ -38,6 +38,7 @@ export async function postStockDocument(documentId: string, actorUserId?: string
     include: { lines: { include: { product: true } }, supplier: true },
   });
   if (!doc) throw new Error("Документ не найден");
+  if (doc.deletedAt) throw new Error("Документ удалён");
   if (doc.postedAt) throw new Error("Документ уже проведён");
 
   await prisma.$transaction(async (tx) => {

@@ -21,7 +21,15 @@ export default async function StoreCustomersPage({ params }: { params: Promise<{
         </div>
         <div>
           <Label htmlFor="phone">Телефон</Label>
-          <Input id="phone" name="phone" required />
+          <Input
+            id="phone"
+            name="phone"
+            required
+            inputMode="numeric"
+            autoComplete="tel"
+            pattern="[0-9]*"
+            title="Только цифры"
+          />
         </div>
         <div className="sm:col-span-2">
           <Label htmlFor="notes">Заметка</Label>

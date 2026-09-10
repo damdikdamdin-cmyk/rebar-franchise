@@ -250,7 +250,7 @@ export default async function ReportsPage({
                     {rub(s.amount)}
                   </span>
                   <span className="font-mono text-[10px] text-muted-foreground">
-                    прибыль {rub(s.deletedAt ? 0 : s.amount - saleCost)}
+                    валовая прибыль {rub(s.deletedAt ? 0 : s.amount - saleCost)}
                   </span>
                   <div className="flex gap-3">
                     <Link href={`/stores/${id}/sales/${s.id}`} className="underline">
@@ -267,6 +267,14 @@ export default async function ReportsPage({
               </li>
             );
           })}
+          {sales.length ? (
+            <li className="flex flex-wrap items-center justify-between gap-2 bg-muted/30 px-4 py-3 text-sm font-medium">
+              <span className="font-mono text-[10px] uppercase tracking-[0.12em]">Итого</span>
+              <span className="font-mono text-xs">
+                выручка {rub(revenue)} · валовая прибыль {rub(profit)} · чеков {sales.filter((s) => !s.deletedAt).length}
+              </span>
+            </li>
+          ) : null}
         </ul>
       </section>
     </div>

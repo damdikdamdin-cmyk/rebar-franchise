@@ -242,6 +242,17 @@ export default async function HomePage({
                   </tr>
                 ))}
               </tbody>
+              {byCity.length ? (
+                <tfoot>
+                  <tr className="border-t border-border bg-muted/30 font-medium">
+                    <td className="px-4 py-3 font-mono text-[10px] uppercase tracking-[0.12em]">Итого</td>
+                    <td className="px-4 py-3 font-mono">{rub(totals.revenue)}</td>
+                    <td className="px-4 py-3 font-mono">{rub(totals.profit)}</td>
+                    <td className="px-4 py-3 font-mono">{totals.qty}</td>
+                    <td className="px-4 py-3 font-mono text-muted-foreground">{totals.checks}</td>
+                  </tr>
+                </tfoot>
+              ) : null}
             </table>
           </Card>
         </section>

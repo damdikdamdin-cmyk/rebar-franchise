@@ -67,7 +67,11 @@ export default async function TeamRolesPage({
         </div>
       </div>
 
-      {sp.error ? <p className="text-sm text-destructive">Проверьте название роли.</p> : null}
+      {sp.error === "name" ? (
+        <p className="text-sm text-destructive">Укажите название роли.</p>
+      ) : sp.error ? (
+        <p className="text-sm text-destructive">Не удалось сохранить роль. Проверьте название и права.</p>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
         <section className="border border-border bg-card">
@@ -109,7 +113,7 @@ export default async function TeamRolesPage({
           <h2 className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em]">
             {edit ? `Редактировать · ${edit.name}` : "Добавить роль"}
           </h2>
-          <form action={upsertAccessRole} className="space-y-3">
+          <form key={edit?.id ?? "new"} action={upsertAccessRole} className="space-y-3">
             {edit ? <input type="hidden" name="id" value={edit.id} /> : null}
             <div>
               <Label>Название *</Label>
@@ -139,7 +143,7 @@ export default async function TeamRolesPage({
             {user.role === "store_manager" && user.storeId ? (
               <input type="hidden" name="storeId" value={user.storeId} />
             ) : null}
-            <RolePermissionsForm defaults={defaults} />
+            <RolePermissionsForm key={edit?.id ?? "new-perms"} defaults={defaults} />
             <div className="flex gap-2 pt-2">
               <Button type="submit">{edit ? "Сохранить" : "Создать роль"}</Button>
               {edit ? (
@@ -150,7 +154,7 @@ export default async function TeamRolesPage({
             </div>
             {edit?.system ? (
               <p className="text-xs text-muted-foreground">
-                Системный пресет: при сохранении не-админом создаётся копия для точки.
+                Системный пресет: при сохранении создаётся/обновляется роль. Пресеты сети больше не затираются при открытии страницы.
               </p>
             ) : null}
           </form>

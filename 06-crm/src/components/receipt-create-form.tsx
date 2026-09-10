@@ -63,6 +63,7 @@ export function ReceiptCreateForm({
   const [lines, setLines] = useState<Line[]>([]);
   const [triedAdd, setTriedAdd] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [addFeedback, setAddFeedback] = useState<string | null>(null);
 
   const suggestions = useMemo(() => {
     const q = modelName.trim().toLowerCase();
@@ -113,6 +114,12 @@ export function ReceiptCreateForm({
     if (!name || !priceText.trim() || !retailText.trim()) return;
     if (serialTracked && !serial.trim()) return;
 
+    const sn = serial.trim();
+    if (sn && lines.some((l) => (l.serial ?? "").toLowerCase() === sn.toLowerCase())) {
+      setAddFeedback("Этот IMEI уже в документе");
+      return;
+    }
+
     const matched =
       catalog.find((p) => p.id === productId && !p.id.startsWith("tmp-")) ??
       catalog.find((p) => p.name.toLowerCase() === name.toLowerCase() && !p.id.startsWith("tmp-"));
@@ -126,8 +133,8 @@ export function ReceiptCreateForm({
       price,
       retailPrice,
       warrantyDays: Number.isFinite(warrantyDays) && warrantyDays >= 0 ? warrantyDays : 365,
-      serial: serial.trim() || undefined,
-      serialTracked: serialTracked || Boolean(serial.trim()),
+      serial: sn || undefined,
+      serialTracked: serialTracked || Boolean(sn),
       isNew: !matched,
     };
     setLines((prev) => [...prev, line]);
@@ -159,6 +166,8 @@ export function ReceiptCreateForm({
     setQtyText("1");
     setWarrantyText("365");
     setTriedAdd(false);
+    setAddFeedback("Добавлено ✓");
+    window.setTimeout(() => setAddFeedback(null), 2000);
   }
 
   function onImportFile(file: File) {
@@ -184,6 +193,7 @@ export function ReceiptCreateForm({
       const byCode = new Map(catalog.map((p) => [p.code.toLowerCase(), p]));
       const byName = new Map(catalog.map((p) => [p.name.toLowerCase(), p]));
       const next: Line[] = [];
+      const seenSn = new Set<string>();
       for (const row of table.slice(1)) {
         const rowCode = iCode >= 0 ? row[iCode]?.trim() : "";
         const rowName = iName >= 0 ? row[iName]?.trim() : "";
@@ -195,6 +205,11 @@ export function ReceiptCreateForm({
         const purchase = Number(String(row[iPurchase] ?? "").replace(/\s/g, "")) || product?.purchasePrice || 0;
         const retail = Number(String(row[iRetail] ?? "").replace(/\s/g, "")) || product?.retailPrice || 0;
         const sn = iSerial >= 0 ? row[iSerial]?.trim() : "";
+        if (sn) {
+          const key = sn.toLowerCase();
+          if (seenSn.has(key) || lines.some((l) => (l.serial ?? "").toLowerCase() === key)) continue;
+          seenSn.add(key);
+        }
         const w = iWarranty >= 0 ? Number(String(row[iWarranty] ?? "").replace(/\s/g, "")) : 365;
         next.push({
           productId: product?.id ?? null,
@@ -341,6 +356,16 @@ export function ReceiptCreateForm({
       <Button type="button" variant="outline" size="sm" onClick={addLine}>
         + Добавить товар
       </Button>
+      {addFeedback ? (
+        <span
+          className={cn(
+            "ml-3 font-mono text-xs",
+            addFeedback.startsWith("Добавлено") ? "text-green-700" : "text-destructive",
+          )}
+        >
+          {addFeedback}
+        </span>
+      ) : null}
 
       <div className="overflow-x-auto border border-border">
         <table className="w-full min-w-[860px] text-sm">

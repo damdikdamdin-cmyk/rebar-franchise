@@ -166,6 +166,7 @@ model User {
   sales           Sale[]
   salesDeleted    Sale[]           @relation("SaleDeletedBy")
   stockDocuments  StockDocument[]
+  stockDocsDeleted StockDocument[] @relation("StockDocDeletedBy")
   cashTxns        CashTxn[]
   orders          Order[]
   printTemplates  PrintTemplate[]
@@ -721,14 +722,22 @@ model StockDocument {
   totalAmount    Int          @default(0)
   paidAmount     Int          @default(0)
   postedAt       DateTime?
+  /// Мягкое удаление: документ скрыт из списков, остаётся в истории
+  deletedAt      DateTime?
+  deletedById    String?
+  deletedReason  String?
   createdAt      DateTime     @default(now())
 
-  store    Store       @relation("DocStore", fields: [storeId], references: [id], onDelete: Cascade)
-  toStore  Store?      @relation("DocToStore", fields: [toStoreId], references: [id], onDelete: SetNull)
-  supplier Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
-  user     User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  lines    StockLine[]
-  cashTxns CashTxn[]
+  store     Store       @relation("DocStore", fields: [storeId], references: [id], onDelete: Cascade)
+  toStore   Store?      @relation("DocToStore", fields: [toStoreId], references: [id], onDelete: SetNull)
+  supplier  Supplier?   @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  deletedBy User?       @relation("StockDocDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  lines     StockLine[]
+  cashTxns  CashTxn[]
+
+  @@index([storeId, type, postedAt])
+  @@index([storeId, deletedAt])
 }
 
 model StockLine {

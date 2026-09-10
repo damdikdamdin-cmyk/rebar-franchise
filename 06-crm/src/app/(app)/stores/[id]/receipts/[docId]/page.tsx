@@ -2,11 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { dateTime, rub, shortDate } from "@/lib/format";
-import { Badge } from "@/components/ui/fields";
+import { Badge, Input, Label } from "@/components/ui/fields";
 import { Button } from "@/components/ui/button";
 import { PrintActions } from "@/components/print/print-actions";
 import { ExcelExportButton } from "@/components/excel-export-button";
-import { postExistingStockDoc } from "@/actions/retail";
+import { postExistingStockDoc, softDeleteStockDoc } from "@/actions/retail";
+import { DeletedMark } from "@/components/deleted-mark";
 
 export default async function ReceiptDetailPage({
   params,
@@ -19,6 +20,7 @@ export default async function ReceiptDetailPage({
     include: {
       supplier: true,
       user: true,
+      deletedBy: true,
       store: true,
       lines: { include: { product: true } },
     },
@@ -62,6 +64,7 @@ export default async function ReceiptDetailPage({
             <Badge tone={doc.postedAt ? "success" : "steel"}>
               {doc.postedAt ? (doc.paidAmount >= doc.totalAmount && doc.totalAmount > 0 ? "Оплачено" : "Проведён") : "Черновик"}
             </Badge>
+            <DeletedMark at={doc.deletedAt} who={doc.deletedBy?.name} />
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -163,11 +166,24 @@ export default async function ReceiptDetailPage({
         <Link href={`/stores/${storeId}/receipts`} className="inline-flex h-9 items-center border border-border px-3 text-sm">
           Закрыть
         </Link>
-        {!doc.postedAt ? (
+        {!doc.postedAt && !doc.deletedAt ? (
           <form action={postExistingStockDoc}>
             <input type="hidden" name="storeId" value={storeId} />
             <input type="hidden" name="documentId" value={doc.id} />
             <Button type="submit">Провести</Button>
+          </form>
+        ) : null}
+        {!doc.deletedAt ? (
+          <form action={softDeleteStockDoc} className="flex flex-wrap items-end gap-2 border border-border p-2">
+            <input type="hidden" name="storeId" value={storeId} />
+            <input type="hidden" name="documentId" value={doc.id} />
+            <div>
+              <Label htmlFor="reason">Причина удаления</Label>
+              <Input id="reason" name="reason" placeholder="Ошибка ввода…" className="w-56" />
+            </div>
+            <Button type="submit" variant="secondary">
+              Удалить документ
+            </Button>
           </form>
         ) : null}
       </div>
