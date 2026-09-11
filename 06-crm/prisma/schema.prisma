@@ -573,6 +573,8 @@ model Sale {
   sellerUserId  String?
   amount        Int
   creditAmount  Int       @default(0)
+  /// Оплата картой (остальное — наличные, минус Lendo)
+  cardAmount    Int       @default(0)
   discountTotal Int       @default(0)
   note          String?
   number        String?

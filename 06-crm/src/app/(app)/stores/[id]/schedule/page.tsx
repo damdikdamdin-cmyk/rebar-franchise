@@ -48,7 +48,7 @@ export default async function SchedulePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ month?: string; week?: string; edit?: string; invited?: string }>;
+  searchParams: Promise<{ month?: string; week?: string; edit?: string; invited?: string; date?: string; user?: string }>;
 }) {
   const { id: storeId } = await params;
   const sp = await searchParams;
@@ -116,6 +116,8 @@ export default async function SchedulePage({
 
   const edit = sp.edit ? shifts.find((s) => s.id === sp.edit) : null;
   const appUrl = process.env.APP_URL ?? "http://localhost:3100";
+  const stickyUserId = edit?.userId ?? sp.user ?? staff[0]?.id ?? "";
+  const stickyDate = edit ? ymd(edit.date) : sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : todayKey;
 
   const byDay = new Map<string, typeof shifts>();
   for (const s of shifts) {
@@ -249,6 +251,9 @@ export default async function SchedulePage({
         <h3 className="mb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
           {edit ? "Редактировать смену" : "Поставить в график"}
         </h3>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Сотрудник запоминается после постановки. Кликнув по дню в календаре — подставится дата.
+        </p>
         <form action={upsertWorkShift} className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <input type="hidden" name="storeId" value={storeId} />
           <input type="hidden" name="month" value={monthParam} />
@@ -258,7 +263,8 @@ export default async function SchedulePage({
             <select
               name="userId"
               required
-              defaultValue={edit?.userId ?? staff[0]?.id ?? ""}
+              key={`user-${stickyUserId}-${edit?.id ?? "new"}`}
+              defaultValue={stickyUserId}
               className="mt-1 flex h-9 w-full border border-input bg-background px-3 text-sm"
             >
               {staff.map((u) => (
@@ -270,7 +276,7 @@ export default async function SchedulePage({
           </div>
           <div>
             <Label required>Дата</Label>
-            <Input name="date" type="date" required defaultValue={edit ? ymd(edit.date) : todayKey} />
+            <Input name="date" type="date" required defaultValue={stickyDate} key={`date-${stickyDate}-${edit?.id ?? "new"}`} />
           </div>
           <div>
             <Label>Начало</Label>
@@ -330,17 +336,26 @@ export default async function SchedulePage({
                 } ${isToday ? "ring-1 ring-foreground" : ""} ${isPast && inMonth ? "bg-muted/40" : ""}`}
               >
                 <div className="flex items-baseline justify-between gap-1">
-                  <p
-                    className={`font-mono text-[11px] ${
+                  <Link
+                    href={`/stores/${storeId}/schedule?month=${monthParam}&date=${key}${stickyUserId ? `&user=${stickyUserId}` : ""}`}
+                    className={`font-mono text-[11px] underline-offset-2 hover:underline ${
                       isToday ? "font-semibold text-foreground" : "text-muted-foreground"
-                    }`}
+                    } ${sp.date === key ? "underline" : ""}`}
                   >
                     {d.getDate()}
-                  </p>
+                  </Link>
                   {isPast && inMonth && list.length ? (
                     <span className="font-mono text-[9px] uppercase text-muted-foreground">было</span>
                   ) : null}
                 </div>
+                {inMonth && !edit ? (
+                  <Link
+                    href={`/stores/${storeId}/schedule?month=${monthParam}&date=${key}${stickyUserId ? `&user=${stickyUserId}` : ""}`}
+                    className="mt-1 block font-mono text-[9px] uppercase text-muted-foreground hover:text-foreground"
+                  >
+                    + смена
+                  </Link>
+                ) : null}
                 <ul className="mt-1 space-y-1">
                   {list.map((s) => (
                     <li key={s.id} className="border border-border bg-background p-1 text-[10px] leading-tight">

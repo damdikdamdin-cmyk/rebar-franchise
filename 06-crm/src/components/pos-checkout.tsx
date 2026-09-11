@@ -88,6 +88,8 @@ export function PosCheckout({
   const [printWarranty, setPrintWarranty] = useState(true);
   const [picker, setPicker] = useState<ProductRow | null>(null);
   const [triedSubmit, setTriedSubmit] = useState(false);
+  const [cardText, setCardText] = useState("");
+  const [creditText, setCreditText] = useState("");
 
   const preferredPrint = useMemo(() => {
     const keys = printKeys.length ? printKeys : ["receipt", "warranty"];
@@ -164,6 +166,9 @@ export function PosCheckout({
   }, [products, query, resolveSerial, serials, imeiAliases]);
 
   const total = cart.reduce((s, l) => s + calcLine(l), 0);
+  const cardAmount = Math.max(0, Math.trunc(Number(cardText.replace(/\D/g, "")) || 0));
+  const creditAmount = Math.max(0, Math.trunc(Number(creditText.replace(/\D/g, "")) || 0));
+  const cashAmount = Math.max(0, total - cardAmount - creditAmount);
   const payload = cart.map(({ discountText: _t, serialTracked: _s, serialId: _id, priceText: _p, ...line }) => line);
 
   function pushLine(p: ProductRow, serial?: string, serialId?: string, unitPrice?: number) {
@@ -590,8 +595,32 @@ export function PosCheckout({
                 />
               </div>
               <div>
+                <Label htmlFor="cardAmount">Оплата по карте, ₽</Label>
+                <Input
+                  id="cardAmount"
+                  name="cardAmount"
+                  inputMode="numeric"
+                  value={cardText}
+                  onChange={(e) => setCardText(e.target.value.replace(/\D/g, ""))}
+                />
+              </div>
+              <div>
                 <Label htmlFor="creditAmount">Lendo, ₽</Label>
-                <Input id="creditAmount" name="creditAmount" inputMode="numeric" defaultValue="" />
+                <Input
+                  id="creditAmount"
+                  name="creditAmount"
+                  inputMode="numeric"
+                  value={creditText}
+                  onChange={(e) => setCreditText(e.target.value.replace(/\D/g, ""))}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Наличные · {rub(cashAmount)}
+                  {cardAmount || creditAmount
+                    ? ` · карта ${rub(cardAmount)} · Lendo ${rub(creditAmount)}`
+                    : ""}
+                </p>
               </div>
               <div>
                 <Label htmlFor="note">Комментарий</Label>

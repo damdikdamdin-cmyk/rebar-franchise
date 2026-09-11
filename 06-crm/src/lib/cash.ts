@@ -14,6 +14,8 @@ export async function ensureStoreCash(storeId: string) {
 export async function ensureCashCategories() {
   const defaults = [
     { name: "Продажа", direction: "in" as const, system: true },
+    { name: "Оплата по карте", direction: "in" as const, system: true },
+    { name: "Сторно оплаты по карте", direction: "out" as const, system: true },
     { name: "Предоплата заказа", direction: "in" as const, system: true },
     { name: "Оплата поставщику", direction: "out" as const, system: true },
     { name: "Возврат клиенту", direction: "out" as const, system: true },

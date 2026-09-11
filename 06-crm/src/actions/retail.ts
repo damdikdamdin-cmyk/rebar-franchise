@@ -165,6 +165,7 @@ export async function completeSale(formData: FormData) {
   const phone = normalizePhone(String(formData.get("phone") ?? ""));
   const customerName = String(formData.get("customerName") ?? "").trim();
   const creditAmount = Number(formData.get("creditAmount") ?? 0);
+  const cardAmount = Number(formData.get("cardAmount") ?? 0);
   const note = String(formData.get("note") ?? "").trim() || null;
   const printKeys = [
     formData.get("printReceipt") ? "receipt" : null,
@@ -296,6 +297,7 @@ export async function completeSale(formData: FormData) {
         sellerUserId: user.id,
         amount,
         creditAmount: Math.max(0, Math.round(creditAmount)),
+        cardAmount: Math.max(0, Math.round(cardAmount)),
         discountTotal,
         note,
         number,
@@ -349,14 +351,27 @@ export async function completeSale(formData: FormData) {
     return created;
   });
 
-  const cashIn = amount - Math.max(0, Math.round(creditAmount));
+  const credit = Math.max(0, Math.round(creditAmount));
+  const card = Math.max(0, Math.round(cardAmount));
+  const cashIn = Math.max(0, amount - credit - card);
+  const register = await ensureStoreCash(storeId);
   if (cashIn > 0) {
-    const register = await ensureStoreCash(storeId);
     await postCashTxn({
       registerId: register.id,
       direction: "in",
       amount: cashIn,
       categoryName: "Продажа",
+      saleId: sale.id,
+      userId: user.id,
+      note: sale.number ?? undefined,
+    });
+  }
+  if (card > 0) {
+    await postCashTxn({
+      registerId: register.id,
+      direction: "in",
+      amount: card,
+      categoryName: "Оплата по карте",
       saleId: sale.id,
       userId: user.id,
       note: sale.number ?? undefined,
@@ -1383,8 +1398,10 @@ export async function upsertWorkShift(formData: FormData) {
   revalidatePath(`/stores/${storeId}/schedule`);
   revalidatePath(`/stores/${storeId}/payroll`);
   revalidatePath(`/stores/${storeId}/audit`);
-  const q = month ? `?month=${month}` : "";
-  redirect(`/stores/${storeId}/schedule${q}`);
+  const q = new URLSearchParams();
+  if (month) q.set("month", month);
+  q.set("user", userId);
+  redirect(`/stores/${storeId}/schedule?${q.toString()}`);
 }
 
 export async function deleteWorkShift(formData: FormData) {
@@ -1761,14 +1778,25 @@ export async function softDeleteSale(formData: FormData) {
     );
   });
 
-  const cashIn = sale.amount - sale.creditAmount;
-  if (cashIn > 0) {
-    const register = await ensureStoreCash(storeId);
+  const register = await ensureStoreCash(storeId);
+  const cashPart = Math.max(0, sale.amount - sale.creditAmount - (sale.cardAmount ?? 0));
+  if (cashPart > 0) {
     await postCashTxn({
       registerId: register.id,
       direction: "out",
-      amount: cashIn,
+      amount: cashPart,
       categoryName: "Сторно продажи",
+      saleId: sale.id,
+      userId: user.id,
+      note: `Удаление чека ${sale.number ?? sale.id.slice(0, 8)}`,
+    });
+  }
+  if ((sale.cardAmount ?? 0) > 0) {
+    await postCashTxn({
+      registerId: register.id,
+      direction: "out",
+      amount: sale.cardAmount,
+      categoryName: "Сторно оплаты по карте",
       saleId: sale.id,
       userId: user.id,
       note: `Удаление чека ${sale.number ?? sale.id.slice(0, 8)}`,

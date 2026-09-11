@@ -21,7 +21,7 @@ export default async function StorePage({ params }: { params: Promise<{ id: stri
       partner: true,
       staff: { include: { enrollments: { include: { course: { include: { lessons: true } }, progress: true } } } },
       launchProjects: true,
-      sales: { where: { soldAt: { gte: since } } },
+      sales: { where: { soldAt: { gte: since }, deletedAt: null } },
       balances: true,
       cashRegisters: true,
       orders: { where: { status: "reserved" } },

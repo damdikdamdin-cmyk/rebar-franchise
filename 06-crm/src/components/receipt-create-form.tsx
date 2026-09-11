@@ -5,7 +5,7 @@ import { createStockDoc } from "@/actions/retail";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/fields";
 import { rub } from "@/lib/format-client";
-import { parseExcelCsv } from "@/lib/excel-csv";
+import { parseSpreadsheetFile } from "@/lib/spreadsheet";
 import { cn } from "@/lib/utils";
 
 type ProductOpt = {
@@ -104,6 +104,13 @@ export function ReceiptCreateForm({
     setProductId("");
   }
 
+  function splitSerials(raw: string) {
+    return raw
+      .split(/[\n,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
   function addLine() {
     setTriedAdd(true);
     const name = modelName.trim();
@@ -112,88 +119,106 @@ export function ReceiptCreateForm({
     const warrantyDays = Number(warrantyText);
     const qty = Math.max(1, Number(qtyText) || 1);
     if (!name || !priceText.trim() || !retailText.trim()) return;
-    if (serialTracked && !serial.trim()) return;
 
-    const sn = serial.trim();
-    if (sn && lines.some((l) => (l.serial ?? "").toLowerCase() === sn.toLowerCase())) {
-      setAddFeedback("Этот IMEI уже в документе");
-      return;
-    }
+    const serials = serialTracked ? splitSerials(serial) : [];
+    if (serialTracked && !serials.length) return;
 
     const matched =
       catalog.find((p) => p.id === productId && !p.id.startsWith("tmp-")) ??
       catalog.find((p) => p.name.toLowerCase() === name.toLowerCase() && !p.id.startsWith("tmp-"));
 
-    const line: Line = {
-      productId: matched?.id ?? null,
-      code: code.trim() || matched?.code || "новый",
-      barcode: barcode.trim() || matched?.barcode || "",
-      name: matched?.name ?? name,
-      qty: serialTracked || serial.trim() ? 1 : qty,
-      price,
-      retailPrice,
-      warrantyDays: Number.isFinite(warrantyDays) && warrantyDays >= 0 ? warrantyDays : 365,
-      serial: sn || undefined,
-      serialTracked: serialTracked || Boolean(sn),
-      isNew: !matched,
-    };
-    setLines((prev) => [...prev, line]);
+    const existingSn = new Set(lines.map((l) => (l.serial ?? "").toLowerCase()).filter(Boolean));
+    const toAdd: Line[] = [];
+
+    if (serialTracked) {
+      const dupInInput = new Set<string>();
+      for (const sn of serials) {
+        const key = sn.toLowerCase();
+        if (dupInInput.has(key) || existingSn.has(key)) {
+          setAddFeedback(`IMEI уже в документе: ${sn}`);
+          continue;
+        }
+        dupInInput.add(key);
+        existingSn.add(key);
+        toAdd.push({
+          productId: matched?.id ?? null,
+          code: code.trim() || matched?.code || "новый",
+          barcode: barcode.trim() || matched?.barcode || "",
+          name: matched?.name ?? name,
+          qty: 1,
+          price,
+          retailPrice,
+          warrantyDays: Number.isFinite(warrantyDays) && warrantyDays >= 0 ? warrantyDays : 365,
+          serial: sn,
+          serialTracked: true,
+          isNew: !matched,
+        });
+      }
+      if (!toAdd.length) return;
+    } else {
+      toAdd.push({
+        productId: matched?.id ?? null,
+        code: code.trim() || matched?.code || "новый",
+        barcode: barcode.trim() || matched?.barcode || "",
+        name: matched?.name ?? name,
+        qty,
+        price,
+        retailPrice,
+        warrantyDays: Number.isFinite(warrantyDays) && warrantyDays >= 0 ? warrantyDays : 365,
+        serialTracked: false,
+        isNew: !matched,
+      });
+    }
+
+    setLines((prev) => [...prev, ...toAdd]);
     if (!matched) {
       setCatalog((prev) => {
         if (prev.some((p) => p.name.toLowerCase() === name.toLowerCase())) return prev;
         return [
           {
             id: `tmp-${Date.now()}`,
-            code: line.code === "новый" ? "" : line.code,
-            barcode: line.barcode || null,
+            code: toAdd[0].code === "новый" ? "" : toAdd[0].code,
+            barcode: toAdd[0].barcode || null,
             name,
             purchasePrice: price,
             retailPrice,
             qty: 0,
-            serialTracked: line.serialTracked ?? true,
+            serialTracked: Boolean(serialTracked),
           },
           ...prev,
         ];
       });
     }
+    // Модель/цены оставляем — удобно добавлять дубликаты той же позиции с новыми IMEI
     setSerial("");
-    setModelName("");
-    setProductId("");
-    setCode("");
-    setBarcode("");
-    setPriceText("");
-    setRetailText("");
     setQtyText("1");
-    setWarrantyText("365");
     setTriedAdd(false);
-    setAddFeedback("Добавлено ✓");
-    window.setTimeout(() => setAddFeedback(null), 2000);
+    setAddFeedback(toAdd.length > 1 ? `Добавлено ✓ · ${toAdd.length} шт.` : "Добавлено ✓");
+    window.setTimeout(() => setAddFeedback(null), 2500);
   }
 
-  function onImportFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = String(reader.result ?? "");
-      const table = parseExcelCsv(text);
+  async function onImportFile(file: File) {
+    try {
+      const table = await parseSpreadsheetFile(file);
       if (table.length < 2) {
         setImportMsg("Файл пуст или без строк");
         return;
       }
       const header = table[0].map((h) => h.toLowerCase());
       const idx = (names: string[]) => names.map((n) => header.indexOf(n)).find((i) => i >= 0) ?? -1;
-      const iCode = idx(["code", "код"]);
+      const iCode = idx(["code", "код", "артикул"]);
       const iBarcode = idx(["barcode", "штрихкод", "штрих-код", "ean"]);
       const iName = idx(["name", "товар", "наименование", "товары", "модель"]);
-      const iQty = idx(["qty", "кол-во", "количество", "кол"]);
-      const iPurchase = idx(["purchase", "закуп", "закуп. цена", "себестоимость", "price"]);
+      const iQty = idx(["qty", "кол-во", "количество", "кол", "остаток"]);
+      const iPurchase = idx(["purchase", "закуп", "закуп. цена", "себестоимость", "price", "закупочная"]);
       const iRetail = idx(["retail", "розница", "розничная"]);
       const iSerial = idx(["serial", "imei", "s/n", "sn"]);
-      const iWarranty = idx(["warranty", "гарантия", "гарантия дн", "гарантия, дн"]);
+      const iWarranty = idx(["warranty", "гарантия", "гарантия дн", "гарантия, дн", "гарантия в днях"]);
 
       const byCode = new Map(catalog.map((p) => [p.code.toLowerCase(), p]));
       const byName = new Map(catalog.map((p) => [p.name.toLowerCase(), p]));
       const next: Line[] = [];
-      const seenSn = new Set<string>();
+      const seenSn = new Set(lines.map((l) => (l.serial ?? "").toLowerCase()).filter(Boolean));
       for (const row of table.slice(1)) {
         const rowCode = iCode >= 0 ? row[iCode]?.trim() : "";
         const rowName = iName >= 0 ? row[iName]?.trim() : "";
@@ -203,32 +228,52 @@ export function ReceiptCreateForm({
           (rowName && byName.get(rowName.toLowerCase())) ||
           null;
         const purchase = Number(String(row[iPurchase] ?? "").replace(/\s/g, "")) || product?.purchasePrice || 0;
-        const retail = Number(String(row[iRetail] ?? "").replace(/\s/g, "")) || product?.retailPrice || 0;
+        const retail =
+          Number(String(row[iRetail] ?? "").replace(/\s/g, "")) || product?.retailPrice || purchase || 0;
         const sn = iSerial >= 0 ? row[iSerial]?.trim() : "";
         if (sn) {
           const key = sn.toLowerCase();
-          if (seenSn.has(key) || lines.some((l) => (l.serial ?? "").toLowerCase() === key)) continue;
+          if (seenSn.has(key)) continue;
           seenSn.add(key);
         }
         const w = iWarranty >= 0 ? Number(String(row[iWarranty] ?? "").replace(/\s/g, "")) : 365;
-        next.push({
-          productId: product?.id ?? null,
-          code: rowCode || product?.code || "новый",
-          barcode: (iBarcode >= 0 ? row[iBarcode]?.trim() : "") || product?.barcode || "",
-          name: rowName || product?.name || rowCode,
-          qty: Math.max(1, Number(row[iQty] ?? 1) || 1),
-          price: purchase,
-          retailPrice: retail,
-          warrantyDays: Number.isFinite(w) && w >= 0 ? w : 365,
-          serial: sn || undefined,
-          serialTracked: Boolean(sn) || product?.serialTracked,
-          isNew: !product,
-        });
+        const qtyRaw = iQty >= 0 ? Number(String(row[iQty] ?? "").replace(/\s/g, "")) : 1;
+        const qty = Math.max(1, Number.isFinite(qtyRaw) ? Math.trunc(qtyRaw) : 1);
+        // Без IMEI: одна строка с количеством. С IMEI — по 1 шт.
+        if (sn) {
+          next.push({
+            productId: product?.id ?? null,
+            code: rowCode || product?.code || "новый",
+            barcode: (iBarcode >= 0 ? row[iBarcode]?.trim() : "") || product?.barcode || "",
+            name: rowName || product?.name || rowCode,
+            qty: 1,
+            price: purchase,
+            retailPrice: retail,
+            warrantyDays: Number.isFinite(w) && w >= 0 ? w : 365,
+            serial: sn,
+            serialTracked: true,
+            isNew: !product,
+          });
+        } else {
+          next.push({
+            productId: product?.id ?? null,
+            code: rowCode || product?.code || "новый",
+            barcode: (iBarcode >= 0 ? row[iBarcode]?.trim() : "") || product?.barcode || "",
+            name: rowName || product?.name || rowCode,
+            qty,
+            price: purchase,
+            retailPrice: retail,
+            warrantyDays: Number.isFinite(w) && w >= 0 ? w : 365,
+            serialTracked: product?.serialTracked ?? false,
+            isNew: !product,
+          });
+        }
       }
       setLines((prev) => [...prev, ...next]);
-      setImportMsg(`Загружено: ${next.length}`);
-    };
-    reader.readAsText(file);
+      setImportMsg(`Загружено: ${next.length} · ${file.name}`);
+    } catch {
+      setImportMsg("Не удалось прочитать файл. Нужен .xlsx / .xls / .csv");
+    }
   }
 
   const totalPurchase = lines.reduce((s, l) => s + l.price * l.qty, 0);
@@ -243,11 +288,11 @@ export function ReceiptCreateForm({
           Загрузить Excel
           <input
             type="file"
-            accept=".csv,.txt,text/csv"
+            accept=".xlsx,.xls,.xlsm,.csv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) onImportFile(f);
+              if (f) void onImportFile(f);
               e.target.value = "";
             }}
           />
@@ -341,12 +386,21 @@ export function ReceiptCreateForm({
           <Label required={serialTracked} invalid={serialInvalid}>
             IMEI / S/N
           </Label>
-          <Input
+          <textarea
             value={serial}
-            invalid={serialInvalid}
             onChange={(e) => setSerial(e.target.value)}
-            className="font-mono"
+            rows={serialTracked ? 3 : 1}
+            placeholder={serialTracked ? "Один или несколько: каждый с новой строки" : ""}
+            className={cn(
+              "mt-1 flex w-full border border-input bg-background px-3 py-2 font-mono text-sm",
+              serialInvalid && "border-destructive",
+            )}
           />
+          {serialTracked ? (
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Несколько одинаковых устройств — вставьте все IMEI списком, каждая строка = отдельная позиция
+            </p>
+          ) : null}
         </div>
       </div>
       <label className="flex items-center gap-2 text-sm">
